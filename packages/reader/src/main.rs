@@ -14,6 +14,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixListener;
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ReadRequest {
     file_path: String,
     diff: String,
