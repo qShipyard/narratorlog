@@ -91,8 +91,8 @@ Returns the current authenticated user.
   "role": "admin",
   "team": {
     "id": "uuid",
-    "name": "Acme Engineering",
-    "slug": "acme"
+    "name": "qShipyard Engineering",
+    "slug": "qShipyard"
   }
 }
 ```
@@ -111,8 +111,8 @@ List connected repositories.
     {
       "id": "uuid",
       "name": "backend",
-      "full_name": "acme/backend",
-      "url": "https://github.com/acme/backend",
+      "full_name": "qShipyard/backend",
+      "url": "https://github.com/qShipyard/backend",
       "provider": "github",
       "default_branch": "main",
       "is_active": true,
@@ -134,8 +134,8 @@ List repos available to connect from the user's connected git platform.
   "data": [
     {
       "provider_id": "123456",
-      "full_name": "acme/frontend",
-      "url": "https://github.com/acme/frontend",
+      "full_name": "qShipyard/frontend",
+      "url": "https://github.com/qShipyard/frontend",
       "already_connected": false
     }
   ]
@@ -152,8 +152,8 @@ Connect a repository.
 {
   "provider": "github",
   "provider_id": "123456",
-  "full_name": "acme/backend",
-  "url": "https://github.com/acme/backend",
+  "full_name": "qShipyard/backend",
+  "url": "https://github.com/qShipyard/backend",
   "default_branch": "main"
 }
 ```
@@ -162,7 +162,7 @@ Connect a repository.
 ```json
 {
   "id": "uuid",
-  "full_name": "acme/backend",
+  "full_name": "qShipyard/backend",
   "is_active": true,
   "webhook_registered": true
 }
@@ -224,7 +224,7 @@ List all scans, newest first.
       "id": "uuid",
       "repository": {
         "id": "uuid",
-        "full_name": "acme/backend"
+        "full_name": "qShipyard/backend"
       },
       "status": "awaiting_approval",
       "triggered_by": "scheduled",
@@ -276,7 +276,7 @@ Get full scan detail.
 ```json
 {
   "id": "uuid",
-  "repository": { "id": "uuid", "full_name": "acme/backend" },
+  "repository": { "id": "uuid", "full_name": "qShipyard/backend" },
   "status": "awaiting_approval",
   "triggered_by": "scheduled",
   "triggered_by_user": null,
