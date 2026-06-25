@@ -1,0 +1,42 @@
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+go.work.sum
+
+# Rust
+target/
+Cargo.lock
+
+# Node
+node_modules/
+.pnpm-store/
+dist/
+.next/
+*.tsbuildinfo
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# narratorlog state (teams can choose to commit or ignore this)
+.narratorlog-state.json
+
+# Docker
+*.log

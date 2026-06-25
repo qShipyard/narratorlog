@@ -1,0 +1,51 @@
+# narratorlog configuration — we dogfood our own tool
+# This generates our own weekly changelog from our own commits
+
+scan:
+  provider: github
+  repo: narratorlog/narratorlog
+  branch: main
+  cadence: weekly
+  lookback: 7d
+
+filter:
+  skip_authors:
+    - dependabot[bot]
+    - renovate[bot]
+  skip_patterns:
+    - "^wip"
+    - "^merge branch"
+    - "^merge pull request"
+
+ai:
+  provider: anthropic
+  model: claude-sonnet-4-6
+  depth: standard
+
+audiences:
+  - id: developers
+    tone: technical
+  - id: community
+    tone: plain-english
+
+approval:
+  required: true
+  via: github-pr
+  timeout: 48h
+
+outputs:
+  - audience: developers
+    plugin: markdown
+    config:
+      path: ./CHANGELOG.md
+      open_pr: true
+  - audience: community
+    plugin: markdown
+    config:
+      path: ./CHANGELOG-COMMUNITY.md
+      open_pr: true
+
+privacy:
+  scrub_secrets: true
+  send_diffs: true
+  local_only: false

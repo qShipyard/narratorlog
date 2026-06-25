@@ -1,0 +1,17 @@
+# Core pipeline — Go
+/apps/api/internal/pipeline/    @narratorlog/core
+
+# Rust reader
+/packages/reader/               @narratorlog/core
+
+# Web app
+/apps/web/                      @narratorlog/web
+
+# Plugin SDK
+/packages/sdk/                  @narratorlog/core
+
+# All plugins — community PRs reviewed by maintainers
+/plugins/                       @narratorlog/maintainers
+
+# Docs — open to all
+/docs/                          @narratorlog/maintainers
