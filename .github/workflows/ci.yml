@@ -7,8 +7,33 @@ on:
     branches: [main, dev]
 
 jobs:
+  # Detect which language trees changed so each job runs only when relevant.
+  # Skipped jobs report success, so they never block an unrelated PR.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.filter.outputs.go }}
+      rust: ${{ steps.filter.outputs.rust }}
+      typescript: ${{ steps.filter.outputs.typescript }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            go:
+              - 'apps/api/**'
+            rust:
+              - 'packages/reader/**'
+            typescript:
+              - 'apps/web/**'
+              - 'packages/sdk/**'
+              - 'plugins/**'
+
   go:
     name: Go
+    needs: changes
+    if: ${{ needs.changes.outputs.go == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,6 +47,8 @@ jobs:
 
   rust:
     name: Rust
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,18 +58,22 @@ jobs:
       - name: Clippy
         run: cd packages/reader && cargo clippy -- -D warnings
 
-  typescript:
-    name: TypeScript
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-      - run: pnpm install
-      - run: pnpm typecheck
-      - run: pnpm lint
+  # Disabled until the JS workspace is bootstrapped (root package.json, turbo,
+  # tsconfig, pnpm-lock.yaml). Re-enable once those exist.
+  # typescript:
+  #   name: TypeScript
+  #   needs: changes
+  #   if: ${{ needs.changes.outputs.typescript == 'true' }}
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: pnpm/action-setup@v4
+  #       with:
+  #         version: 9
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: '20'
+  #         cache: 'pnpm'
+  #     - run: pnpm install
+  #     - run: pnpm typecheck
+  #     - run: pnpm lint
