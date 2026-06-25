@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS scans;
+DROP TYPE IF EXISTS scan_trigger;
+DROP TYPE IF EXISTS scan_status;
