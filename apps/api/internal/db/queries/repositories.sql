@@ -34,3 +34,8 @@ WHERE id = $1;
 -- name: GetRepositoryByProviderID :one
 SELECT * FROM repositories
 WHERE team_id = $1 AND provider = $2 AND provider_id = $3;
+
+-- name: ListActiveWeeklyRepos :many
+SELECT * FROM repositories
+WHERE is_active = true
+  AND config->>'cadence' = 'weekly';

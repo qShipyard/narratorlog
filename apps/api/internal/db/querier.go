@@ -44,6 +44,7 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByProvider(ctx context.Context, arg GetUserByProviderParams) (User, error)
+	ListActiveWeeklyRepos(ctx context.Context) ([]Repository, error)
 	ListAllCommitsByScan(ctx context.Context, scanID uuid.UUID) ([]Commit, error)
 	ListAuditLogByEntity(ctx context.Context, arg ListAuditLogByEntityParams) ([]AuditLog, error)
 	ListAuditLogByTeam(ctx context.Context, arg ListAuditLogByTeamParams) ([]AuditLog, error)
