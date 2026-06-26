@@ -234,6 +234,33 @@ type AuditEntry struct {
 	Metadata   map[string]any
 }
 
+// DeliverScanMeta is scan metadata passed to output plugins.
+type DeliverScanMeta struct {
+	ID         string `json:"id"`
+	Repository string `json:"repository"`
+	ScanFrom   string `json:"scan_from"`
+	ScanTo     string `json:"scan_to"`
+}
+
+// DeliverPluginRequest is sent to an output plugin.
+type DeliverPluginRequest struct {
+	Action        string                 `json:"action"`
+	AudienceID    string                 `json:"audience_id"`
+	Tone          string                 `json:"tone"`
+	Content       string                 `json:"content"`
+	EditedContent *string                `json:"edited_content,omitempty"`
+	Scan          DeliverScanMeta        `json:"scan"`
+	Config        map[string]interface{} `json:"config"`
+}
+
+// DeliverPluginResponse is returned by an output plugin.
+type DeliverPluginResponse struct {
+	Success   bool    `json:"success"`
+	Reference *string `json:"reference,omitempty"`
+	Message   *string `json:"message,omitempty"`
+	Error     *string `json:"error,omitempty"`
+}
+
 type Store interface {
 	// Scan
 	UpdateScanStatus(ctx context.Context, scanID string, status ScanStatus, errMsg *string) error
