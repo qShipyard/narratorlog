@@ -1,7 +1,7 @@
 {
-  "name": "@narratorlog/plugin-output-slack",
+  "name": "@narratorlog/plugin-output-linear",
   "version": "0.1.0",
-  "description": "Slack output plugin for narratorlog",
+  "description": "Linear output plugin for narratorlog",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@narratorlog/sdk": "workspace:*",
-    "@slack/web-api": "^7.0.0"
+    "@linear/sdk": "^39.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

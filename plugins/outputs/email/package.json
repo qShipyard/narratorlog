@@ -1,7 +1,7 @@
 {
-  "name": "@narratorlog/plugin-output-slack",
+  "name": "@narratorlog/plugin-output-email",
   "version": "0.1.0",
-  "description": "Slack output plugin for narratorlog",
+  "description": "Email output plugin for narratorlog",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
@@ -9,10 +9,11 @@
   },
   "dependencies": {
     "@narratorlog/sdk": "workspace:*",
-    "@slack/web-api": "^7.0.0"
+    "nodemailer": "^6.9.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/nodemailer": "^6.4.0",
     "typescript": "^5.4.0"
   }
 }
