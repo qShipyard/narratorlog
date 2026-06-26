@@ -6,8 +6,6 @@ import (
 	"sync"
 )
 
-// memStore is an in-memory Store for pipeline tests. It preserves insertion
-// order for commits and groups so assertions are deterministic.
 type memStore struct {
 	mu sync.Mutex
 
@@ -26,14 +24,18 @@ func newMemStore() *memStore {
 	}
 }
 
-func (s *memStore) UpdateScanStatus(_ interface{}, _ string, status ScanStatus, _ *string) error {
+func (s *memStore) UpdateScanStatus(_ context.Context, _ string, status ScanStatus, _ *string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.statuses = append(s.statuses, status)
 	return nil
 }
 
-func (s *memStore) SaveCommits(_ interface{}, commits []Commit) error {
+func (s *memStore) UpdateScanCounts(_ context.Context, _ string, _, _ int) error {
+	return nil
+}
+
+func (s *memStore) SaveCommits(_ context.Context, commits []Commit) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, c := range commits {
@@ -45,7 +47,7 @@ func (s *memStore) SaveCommits(_ interface{}, commits []Commit) error {
 	return nil
 }
 
-func (s *memStore) GetCommits(_ interface{}, scanID string, includeNoise bool) ([]Commit, error) {
+func (s *memStore) GetCommits(_ context.Context, scanID string, includeNoise bool) ([]Commit, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var out []Commit
@@ -62,7 +64,7 @@ func (s *memStore) GetCommits(_ interface{}, scanID string, includeNoise bool) (
 	return out, nil
 }
 
-func (s *memStore) UpdateCommit(_ interface{}, commit Commit) error {
+func (s *memStore) UpdateCommit(_ context.Context, commit Commit) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.commits[commit.ID]; !ok {
@@ -72,7 +74,11 @@ func (s *memStore) UpdateCommit(_ interface{}, commit Commit) error {
 	return nil
 }
 
-func (s *memStore) SaveCommitGroups(_ interface{}, groups []CommitGroup) error {
+func (s *memStore) GetKnownSHAs(_ context.Context, _ string) (map[string]bool, error) {
+	return map[string]bool{}, nil
+}
+
+func (s *memStore) SaveCommitGroups(_ context.Context, groups []CommitGroup) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, g := range groups {
@@ -84,7 +90,7 @@ func (s *memStore) SaveCommitGroups(_ interface{}, groups []CommitGroup) error {
 	return nil
 }
 
-func (s *memStore) GetCommitGroups(_ interface{}, scanID string) ([]CommitGroup, error) {
+func (s *memStore) GetCommitGroups(_ context.Context, scanID string) ([]CommitGroup, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var out []CommitGroup
@@ -97,7 +103,7 @@ func (s *memStore) GetCommitGroups(_ interface{}, scanID string) ([]CommitGroup,
 	return out, nil
 }
 
-func (s *memStore) UpdateCommitGroupSummary(_ interface{}, groupID string, summary string) error {
+func (s *memStore) UpdateCommitGroupSummary(_ context.Context, groupID string, summary string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	g, ok := s.groups[groupID]
@@ -109,10 +115,14 @@ func (s *memStore) UpdateCommitGroupSummary(_ interface{}, groupID string, summa
 	return nil
 }
 
-func (s *memStore) SaveAudienceDraft(_ interface{}, draft AudienceDraft) error {
+func (s *memStore) SaveAudienceDraft(_ context.Context, draft AudienceDraft) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.drafts = append(s.drafts, draft)
+	return nil
+}
+
+func (s *memStore) CreateAuditLog(_ context.Context, _ AuditEntry) error {
 	return nil
 }
 
@@ -124,8 +134,6 @@ func (s *memStore) lastStatus() ScanStatus {
 	}
 	return s.statuses[len(s.statuses)-1]
 }
-
-// ─── Mock source plugin ───────────────────────────────────────────────────────
 
 type mockSource struct {
 	resp *SourcePluginResponse
