@@ -25,7 +25,9 @@ type Querier interface {
 	CreateScan(ctx context.Context, arg CreateScanParams) (Scan, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, error)
+	CreateTeamWithSetup(ctx context.Context, arg CreateTeamWithSetupParams) (Team, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	CreateUserWithPassword(ctx context.Context, arg CreateUserWithPasswordParams) (User, error)
 	DeactivateRepository(ctx context.Context, id uuid.UUID) error
 	DeleteDraftComment(ctx context.Context, arg DeleteDraftCommentParams) error
 	DeleteExpiredSessions(ctx context.Context) error
@@ -42,8 +44,10 @@ type Querier interface {
 	GetTeamByID(ctx context.Context, id uuid.UUID) (Team, error)
 	GetTeamBySlug(ctx context.Context, slug string) (Team, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
+	GetUserByEmailWithPassword(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByProvider(ctx context.Context, arg GetUserByProviderParams) (User, error)
+	IsSetupComplete(ctx context.Context) (bool, error)
 	ListActiveWeeklyRepos(ctx context.Context) ([]Repository, error)
 	ListAllCommitsByScan(ctx context.Context, scanID uuid.UUID) ([]Commit, error)
 	ListAuditLogByEntity(ctx context.Context, arg ListAuditLogByEntityParams) ([]AuditLog, error)
@@ -58,6 +62,7 @@ type Querier interface {
 	ListScansByTeam(ctx context.Context, arg ListScansByTeamParams) ([]Scan, error)
 	ListUsersByTeam(ctx context.Context, teamID uuid.UUID) ([]User, error)
 	MarkDraftDelivered(ctx context.Context, id uuid.UUID) error
+	MarkSetupComplete(ctx context.Context, id uuid.UUID) error
 	RejectDraft(ctx context.Context, id uuid.UUID) (AudienceDraft, error)
 	UpdateCommitContext(ctx context.Context, arg UpdateCommitContextParams) error
 	UpdateCommitEnrichment(ctx context.Context, arg UpdateCommitEnrichmentParams) error

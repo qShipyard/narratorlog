@@ -118,8 +118,20 @@ export interface Pagination {
 
 // ─── API calls ────────────────────────────────────────────────────────────────
 
+export const setupApi = {
+  status: () => api.get<{ setup_complete: boolean }>('/setup/status'),
+  complete: (data: {
+    team_name: string
+    admin_name: string
+    email: string
+    password: string
+  }) => api.post('/setup', data),
+}
+
 export const authApi = {
   me: () => api.get<User>('/auth/me'),
+  login: (email: string, password: string) =>
+    api.post<User>('/auth/login', { email, password }),
   logout: () => api.post('/auth/logout'),
 }
 

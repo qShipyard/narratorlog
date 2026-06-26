@@ -14,7 +14,7 @@ import (
 const createTeam = `-- name: CreateTeam :one
 INSERT INTO teams (name, slug)
 VALUES ($1, $2)
-RETURNING id, name, slug, created_at, updated_at
+RETURNING id, name, slug, created_at, updated_at, setup_complete
 `
 
 type CreateTeamParams struct {
@@ -31,12 +31,39 @@ func (q *Queries) CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, e
 		&i.Slug,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SetupComplete,
+	)
+	return i, err
+}
+
+const createTeamWithSetup = `-- name: CreateTeamWithSetup :one
+INSERT INTO teams (name, slug, setup_complete)
+VALUES ($1, $2, $3)
+RETURNING id, name, slug, created_at, updated_at, setup_complete
+`
+
+type CreateTeamWithSetupParams struct {
+	Name          string `json:"name"`
+	Slug          string `json:"slug"`
+	SetupComplete bool   `json:"setup_complete"`
+}
+
+func (q *Queries) CreateTeamWithSetup(ctx context.Context, arg CreateTeamWithSetupParams) (Team, error) {
+	row := q.db.QueryRow(ctx, createTeamWithSetup, arg.Name, arg.Slug, arg.SetupComplete)
+	var i Team
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SetupComplete,
 	)
 	return i, err
 }
 
 const getTeamByID = `-- name: GetTeamByID :one
-SELECT id, name, slug, created_at, updated_at FROM teams
+SELECT id, name, slug, created_at, updated_at, setup_complete FROM teams
 WHERE id = $1
 `
 
@@ -49,12 +76,13 @@ func (q *Queries) GetTeamByID(ctx context.Context, id uuid.UUID) (Team, error) {
 		&i.Slug,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SetupComplete,
 	)
 	return i, err
 }
 
 const getTeamBySlug = `-- name: GetTeamBySlug :one
-SELECT id, name, slug, created_at, updated_at FROM teams
+SELECT id, name, slug, created_at, updated_at, setup_complete FROM teams
 WHERE slug = $1
 `
 
@@ -67,15 +95,38 @@ func (q *Queries) GetTeamBySlug(ctx context.Context, slug string) (Team, error) 
 		&i.Slug,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SetupComplete,
 	)
 	return i, err
+}
+
+const isSetupComplete = `-- name: IsSetupComplete :one
+SELECT setup_complete FROM teams LIMIT 1
+`
+
+func (q *Queries) IsSetupComplete(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, isSetupComplete)
+	var setup_complete bool
+	err := row.Scan(&setup_complete)
+	return setup_complete, err
+}
+
+const markSetupComplete = `-- name: MarkSetupComplete :exec
+UPDATE teams
+SET setup_complete = true, updated_at = now()
+WHERE id = $1
+`
+
+func (q *Queries) MarkSetupComplete(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markSetupComplete, id)
+	return err
 }
 
 const updateTeam = `-- name: UpdateTeam :one
 UPDATE teams
 SET name = $1, updated_at = now()
 WHERE id = $2
-RETURNING id, name, slug, created_at, updated_at
+RETURNING id, name, slug, created_at, updated_at, setup_complete
 `
 
 type UpdateTeamParams struct {
@@ -92,6 +143,7 @@ func (q *Queries) UpdateTeam(ctx context.Context, arg UpdateTeamParams) (Team, e
 		&i.Slug,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SetupComplete,
 	)
 	return i, err
 }

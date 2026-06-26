@@ -38,3 +38,11 @@ RETURNING *;
 
 -- name: DeleteUser :exec
 DELETE FROM users WHERE id = $1;
+
+-- name: CreateUserWithPassword :one
+INSERT INTO users (team_id, email, name, role, provider, provider_id, password)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING *;
+
+-- name: GetUserByEmailWithPassword :one
+SELECT * FROM users WHERE email = $1;
