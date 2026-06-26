@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/narratorlog/narratorlog/internal/auth"
 )
 
@@ -57,13 +58,36 @@ func (h *Handler) Logout(c *gin.Context) {
 
 func (h *Handler) GetMe(c *gin.Context) {
 	userID := c.GetString("user_id")
-	teamID := c.GetString("team_id")
-	role := c.GetString("role")
+
+	id, err := uuid.Parse(userID)
+	if err != nil {
+		errorResponse(c, http.StatusUnauthorized, "INVALID_SESSION", "Invalid session.")
+		return
+	}
+
+	user, err := h.queries.GetUserByID(c.Request.Context(), id)
+	if err != nil {
+		errorResponse(c, http.StatusNotFound, "USER_NOT_FOUND", "User not found.")
+		return
+	}
+
+	team, err := h.queries.GetTeamByID(c.Request.Context(), user.TeamID)
+	if err != nil {
+		errorResponse(c, http.StatusNotFound, "TEAM_NOT_FOUND", "Team not found.")
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"id":      userID,
-		"team_id": teamID,
-		"role":    role,
+		"id":         user.ID,
+		"email":      user.Email,
+		"name":       user.Name,
+		"avatar_url": user.AvatarUrl.String,
+		"role":       user.Role,
+		"team": gin.H{
+			"id":   team.ID,
+			"name": team.Name,
+			"slug": team.Slug,
+		},
 	})
 }
 

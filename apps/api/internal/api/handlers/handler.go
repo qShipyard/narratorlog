@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hibiken/asynq"
 	"github.com/narratorlog/narratorlog/internal/auth"
 	"github.com/narratorlog/narratorlog/internal/config"
 	db "github.com/narratorlog/narratorlog/internal/db"
@@ -14,6 +15,7 @@ type Handler struct {
 	sessions  *auth.SessionManager
 	encryptor *auth.Encryptor
 	cfg       *config.Config
+	asynq     *asynq.Client
 }
 
 func NewHandler(
@@ -21,12 +23,14 @@ func NewHandler(
 	sessions *auth.SessionManager,
 	encryptor *auth.Encryptor,
 	cfg *config.Config,
+	asynqClient *asynq.Client,
 ) *Handler {
 	return &Handler{
 		queries:   queries,
 		sessions:  sessions,
 		encryptor: encryptor,
 		cfg:       cfg,
+		asynq:     asynqClient,
 	}
 }
 
