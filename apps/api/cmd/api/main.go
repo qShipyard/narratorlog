@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/narratorlog/narratorlog/internal/api"
 	"github.com/narratorlog/narratorlog/internal/api/handlers"
@@ -35,6 +36,14 @@ func main() {
 		log.Fatalf("failed to ping database: %v", err)
 	}
 
+	redisOpt, err := asynq.ParseRedisURI(cfg.RedisURL)
+	if err != nil {
+		log.Fatalf("failed to parse redis URL: %v", err)
+	}
+
+	asynqClient := asynq.NewClient(redisOpt)
+	defer asynqClient.Close()
+
 	queries := db.New(pool)
 	sessions := auth.NewSessionManager(cfg.AppSecret)
 
@@ -43,7 +52,7 @@ func main() {
 		log.Fatalf("failed to create encryptor: %v", err)
 	}
 
-	h := handlers.NewHandler(queries, sessions, encryptor, cfg)
+	h := handlers.NewHandler(queries, sessions, encryptor, cfg, asynqClient)
 
 	if os.Getenv("GIN_MODE") == "" {
 		gin.SetMode(gin.ReleaseMode)
