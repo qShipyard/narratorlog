@@ -141,6 +141,48 @@ func (q *Queries) GetRepositoryByProviderID(ctx context.Context, arg GetReposito
 	return i, err
 }
 
+const listActiveWeeklyRepos = `-- name: ListActiveWeeklyRepos :many
+SELECT id, team_id, provider, provider_id, name, full_name, url, default_branch, access_token, webhook_secret, config, is_active, last_scanned_at, created_at, updated_at FROM repositories
+WHERE is_active = true
+  AND config->>'cadence' = 'weekly'
+`
+
+func (q *Queries) ListActiveWeeklyRepos(ctx context.Context) ([]Repository, error) {
+	rows, err := q.db.Query(ctx, listActiveWeeklyRepos)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Repository
+	for rows.Next() {
+		var i Repository
+		if err := rows.Scan(
+			&i.ID,
+			&i.TeamID,
+			&i.Provider,
+			&i.ProviderID,
+			&i.Name,
+			&i.FullName,
+			&i.Url,
+			&i.DefaultBranch,
+			&i.AccessToken,
+			&i.WebhookSecret,
+			&i.Config,
+			&i.IsActive,
+			&i.LastScannedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRepositoriesByTeam = `-- name: ListRepositoriesByTeam :many
 SELECT id, team_id, provider, provider_id, name, full_name, url, default_branch, access_token, webhook_secret, config, is_active, last_scanned_at, created_at, updated_at FROM repositories
 WHERE team_id = $1 AND is_active = true
