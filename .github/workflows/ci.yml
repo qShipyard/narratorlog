@@ -58,22 +58,20 @@ jobs:
       - name: Clippy
         run: cd packages/reader && cargo clippy -- -D warnings
 
-  # Disabled until the JS workspace is bootstrapped (root package.json, turbo,
-  # tsconfig, pnpm-lock.yaml). Re-enable once those exist.
-  # typescript:
-  #   name: TypeScript
-  #   needs: changes
-  #   if: ${{ needs.changes.outputs.typescript == 'true' }}
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: pnpm/action-setup@v4
-  #       with:
-  #         version: 9
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: '20'
-  #         cache: 'pnpm'
-  #     - run: pnpm install
-  #     - run: pnpm typecheck
-  #     - run: pnpm lint
+  typescript:
+    name: TypeScript
+    needs: changes
+    if: ${{ needs.changes.outputs.typescript == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install
+      - run: pnpm typecheck
+      - run: pnpm lint
