@@ -136,6 +136,25 @@ func (p *PluginRunner) CallGenerate(
 	return &resp, nil
 }
 
+// CallDeliverPlugin calls an output plugin to deliver an approved draft.
+func (p *PluginRunner) CallDeliverPlugin(
+	ctx context.Context,
+	pluginPath string,
+	req DeliverPluginRequest,
+) (*DeliverPluginResponse, error) {
+	raw, err := p.run(ctx, pluginPath, req)
+	if err != nil {
+		return nil, fmt.Errorf("deliver plugin call failed: %w", err)
+	}
+
+	var resp DeliverPluginResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("failed to parse deliver response: %w", err)
+	}
+
+	return &resp, nil
+}
+
 // ─── Plugin Path Resolver ─────────────────────────────────────────────────────
 
 // PluginPaths holds resolved filesystem paths to each plugin.
