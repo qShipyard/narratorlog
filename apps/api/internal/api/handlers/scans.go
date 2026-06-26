@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -277,6 +276,3 @@ func lookbackToTime(lookback string) time.Time {
 	return time.Now().UTC().Add(-d)
 }
 
-func marshalJSON(v any) ([]byte, error) {
-	return json.Marshal(v)
-}
