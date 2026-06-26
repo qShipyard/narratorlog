@@ -1,0 +1,37 @@
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /app
+
+RUN apk add --no-cache git
+
+COPY apps/api/go.mod apps/api/go.sum ./
+RUN go mod download
+
+COPY apps/api/ .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o narratorlog-api ./cmd/api
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o narratorlog-worker ./cmd/worker
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates nodejs npm
+
+WORKDIR /app
+
+COPY --from=builder /app/narratorlog-api .
+COPY --from=builder /app/narratorlog-worker .
+
+# Copy TypeScript plugins
+COPY plugins/ ./plugins/
+COPY packages/sdk/ ./packages/sdk/
+
+# Install plugin dependencies
+RUN cd packages/sdk && npm install && npm run build
+RUN cd plugins/sources/github && npm install && npm run build
+RUN cd plugins/ai-providers/anthropic && npm install && npm run build
+RUN cd plugins/outputs/slack && npm install && npm run build
+RUN cd plugins/outputs/markdown && npm install && npm run build
+
+EXPOSE 8080
+
+ENTRYPOINT ["./narratorlog-api"]
+CMD []
