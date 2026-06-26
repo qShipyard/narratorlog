@@ -1,0 +1,22 @@
+{
+  "name": "@narratorlog/plugin-source-github",
+  "version": "0.1.0",
+  "description": "GitHub source plugin for narratorlog",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "node --test dist/index.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@narratorlog/sdk": "workspace:*",
+    "@octokit/rest": "^22.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "typescript": "^6.0.3"
+  }
+}
