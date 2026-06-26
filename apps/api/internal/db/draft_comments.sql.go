@@ -7,10 +7,9 @@ package db
 
 import (
 	"context"
-	"database/sql"
-	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createDraftComment = `-- name: CreateDraftComment :one
@@ -26,7 +25,7 @@ type CreateDraftCommentParams struct {
 }
 
 func (q *Queries) CreateDraftComment(ctx context.Context, arg CreateDraftCommentParams) (DraftComment, error) {
-	row := q.db.QueryRowContext(ctx, createDraftComment, arg.DraftID, arg.UserID, arg.Content)
+	row := q.db.QueryRow(ctx, createDraftComment, arg.DraftID, arg.UserID, arg.Content)
 	var i DraftComment
 	err := row.Scan(
 		&i.ID,
@@ -49,7 +48,7 @@ type DeleteDraftCommentParams struct {
 }
 
 func (q *Queries) DeleteDraftComment(ctx context.Context, arg DeleteDraftCommentParams) error {
-	_, err := q.db.ExecContext(ctx, deleteDraftComment, arg.ID, arg.UserID)
+	_, err := q.db.Exec(ctx, deleteDraftComment, arg.ID, arg.UserID)
 	return err
 }
 
@@ -65,17 +64,17 @@ ORDER BY dc.created_at ASC
 `
 
 type ListCommentsByDraftRow struct {
-	ID         uuid.UUID      `json:"id"`
-	DraftID    uuid.UUID      `json:"draft_id"`
-	UserID     uuid.UUID      `json:"user_id"`
-	Content    string         `json:"content"`
-	CreatedAt  time.Time      `json:"created_at"`
-	UserName   string         `json:"user_name"`
-	UserAvatar sql.NullString `json:"user_avatar"`
+	ID         uuid.UUID          `json:"id"`
+	DraftID    uuid.UUID          `json:"draft_id"`
+	UserID     uuid.UUID          `json:"user_id"`
+	Content    string             `json:"content"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UserName   string             `json:"user_name"`
+	UserAvatar pgtype.Text        `json:"user_avatar"`
 }
 
 func (q *Queries) ListCommentsByDraft(ctx context.Context, draftID uuid.UUID) ([]ListCommentsByDraftRow, error) {
-	rows, err := q.db.QueryContext(ctx, listCommentsByDraft, draftID)
+	rows, err := q.db.Query(ctx, listCommentsByDraft, draftID)
 	if err != nil {
 		return nil, err
 	}
@@ -95,9 +94,6 @@ func (q *Queries) ListCommentsByDraft(ctx context.Context, draftID uuid.UUID) ([
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

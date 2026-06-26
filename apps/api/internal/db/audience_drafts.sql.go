@@ -7,9 +7,9 @@ package db
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const allDraftsApproved = `-- name: AllDraftsApproved :one
@@ -19,7 +19,7 @@ WHERE scan_id = $1
 `
 
 func (q *Queries) AllDraftsApproved(ctx context.Context, scanID uuid.UUID) (bool, error) {
-	row := q.db.QueryRowContext(ctx, allDraftsApproved, scanID)
+	row := q.db.QueryRow(ctx, allDraftsApproved, scanID)
 	var all_approved bool
 	err := row.Scan(&all_approved)
 	return all_approved, err
@@ -37,12 +37,12 @@ RETURNING id, scan_id, audience_id, tone, content, edited_content, status, appro
 `
 
 type ApproveDraftParams struct {
-	ApprovedBy uuid.NullUUID `json:"approved_by"`
-	ID         uuid.UUID     `json:"id"`
+	ApprovedBy pgtype.UUID `json:"approved_by"`
+	ID         uuid.UUID   `json:"id"`
 }
 
 func (q *Queries) ApproveDraft(ctx context.Context, arg ApproveDraftParams) (AudienceDraft, error) {
-	row := q.db.QueryRowContext(ctx, approveDraft, arg.ApprovedBy, arg.ID)
+	row := q.db.QueryRow(ctx, approveDraft, arg.ApprovedBy, arg.ID)
 	var i AudienceDraft
 	err := row.Scan(
 		&i.ID,
@@ -66,7 +66,7 @@ WHERE scan_id = $1 AND status = 'draft'
 `
 
 func (q *Queries) CountPendingDraftsByScan(ctx context.Context, scanID uuid.UUID) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countPendingDraftsByScan, scanID)
+	row := q.db.QueryRow(ctx, countPendingDraftsByScan, scanID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -86,7 +86,7 @@ type CreateAudienceDraftParams struct {
 }
 
 func (q *Queries) CreateAudienceDraft(ctx context.Context, arg CreateAudienceDraftParams) (AudienceDraft, error) {
-	row := q.db.QueryRowContext(ctx, createAudienceDraft,
+	row := q.db.QueryRow(ctx, createAudienceDraft,
 		arg.ScanID,
 		arg.AudienceID,
 		arg.Tone,
@@ -114,7 +114,7 @@ SELECT id, scan_id, audience_id, tone, content, edited_content, status, approved
 `
 
 func (q *Queries) GetDraftByID(ctx context.Context, id uuid.UUID) (AudienceDraft, error) {
-	row := q.db.QueryRowContext(ctx, getDraftByID, id)
+	row := q.db.QueryRow(ctx, getDraftByID, id)
 	var i AudienceDraft
 	err := row.Scan(
 		&i.ID,
@@ -139,7 +139,7 @@ ORDER BY created_at ASC
 `
 
 func (q *Queries) ListDraftsByScan(ctx context.Context, scanID uuid.UUID) ([]AudienceDraft, error) {
-	rows, err := q.db.QueryContext(ctx, listDraftsByScan, scanID)
+	rows, err := q.db.Query(ctx, listDraftsByScan, scanID)
 	if err != nil {
 		return nil, err
 	}
@@ -164,9 +164,6 @@ func (q *Queries) ListDraftsByScan(ctx context.Context, scanID uuid.UUID) ([]Aud
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -180,7 +177,7 @@ WHERE id = $1
 `
 
 func (q *Queries) MarkDraftDelivered(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, markDraftDelivered, id)
+	_, err := q.db.Exec(ctx, markDraftDelivered, id)
 	return err
 }
 
@@ -192,7 +189,7 @@ RETURNING id, scan_id, audience_id, tone, content, edited_content, status, appro
 `
 
 func (q *Queries) RejectDraft(ctx context.Context, id uuid.UUID) (AudienceDraft, error) {
-	row := q.db.QueryRowContext(ctx, rejectDraft, id)
+	row := q.db.QueryRow(ctx, rejectDraft, id)
 	var i AudienceDraft
 	err := row.Scan(
 		&i.ID,
@@ -218,12 +215,12 @@ RETURNING id, scan_id, audience_id, tone, content, edited_content, status, appro
 `
 
 type UpdateDraftContentParams struct {
-	EditedContent sql.NullString `json:"edited_content"`
-	ID            uuid.UUID      `json:"id"`
+	EditedContent pgtype.Text `json:"edited_content"`
+	ID            uuid.UUID   `json:"id"`
 }
 
 func (q *Queries) UpdateDraftContent(ctx context.Context, arg UpdateDraftContentParams) (AudienceDraft, error) {
-	row := q.db.QueryRowContext(ctx, updateDraftContent, arg.EditedContent, arg.ID)
+	row := q.db.QueryRow(ctx, updateDraftContent, arg.EditedContent, arg.ID)
 	var i AudienceDraft
 	err := row.Scan(
 		&i.ID,

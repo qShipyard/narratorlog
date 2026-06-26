@@ -7,10 +7,9 @@ package db
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createCommitGroup = `-- name: CreateCommitGroup :one
@@ -27,10 +26,10 @@ type CreateCommitGroupParams struct {
 }
 
 func (q *Queries) CreateCommitGroup(ctx context.Context, arg CreateCommitGroupParams) (CommitGroup, error) {
-	row := q.db.QueryRowContext(ctx, createCommitGroup,
+	row := q.db.QueryRow(ctx, createCommitGroup,
 		arg.ScanID,
 		arg.Label,
-		pq.Array(arg.CommitIds),
+		arg.CommitIds,
 		arg.GroupType,
 	)
 	var i CommitGroup
@@ -38,7 +37,7 @@ func (q *Queries) CreateCommitGroup(ctx context.Context, arg CreateCommitGroupPa
 		&i.ID,
 		&i.ScanID,
 		&i.Label,
-		pq.Array(&i.CommitIds),
+		&i.CommitIds,
 		&i.GroupType,
 		&i.Summary,
 		&i.CreatedAt,
@@ -53,7 +52,7 @@ ORDER BY created_at ASC
 `
 
 func (q *Queries) ListCommitGroupsByScan(ctx context.Context, scanID uuid.UUID) ([]CommitGroup, error) {
-	rows, err := q.db.QueryContext(ctx, listCommitGroupsByScan, scanID)
+	rows, err := q.db.Query(ctx, listCommitGroupsByScan, scanID)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +64,7 @@ func (q *Queries) ListCommitGroupsByScan(ctx context.Context, scanID uuid.UUID) 
 			&i.ID,
 			&i.ScanID,
 			&i.Label,
-			pq.Array(&i.CommitIds),
+			&i.CommitIds,
 			&i.GroupType,
 			&i.Summary,
 			&i.CreatedAt,
@@ -73,9 +72,6 @@ func (q *Queries) ListCommitGroupsByScan(ctx context.Context, scanID uuid.UUID) 
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -90,11 +86,11 @@ WHERE id = $2
 `
 
 type UpdateCommitGroupSummaryParams struct {
-	Summary sql.NullString `json:"summary"`
-	ID      uuid.UUID      `json:"id"`
+	Summary pgtype.Text `json:"summary"`
+	ID      uuid.UUID   `json:"id"`
 }
 
 func (q *Queries) UpdateCommitGroupSummary(ctx context.Context, arg UpdateCommitGroupSummaryParams) error {
-	_, err := q.db.ExecContext(ctx, updateCommitGroupSummary, arg.Summary, arg.ID)
+	_, err := q.db.Exec(ctx, updateCommitGroupSummary, arg.Summary, arg.ID)
 	return err
 }

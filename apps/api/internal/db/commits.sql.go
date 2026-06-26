@@ -7,12 +7,9 @@ package db
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/sqlc-dev/pqtype"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createCommit = `-- name: CreateCommit :one
@@ -26,27 +23,27 @@ RETURNING id, scan_id, repository_id, sha, message, author_name, author_email, c
 `
 
 type CreateCommitParams struct {
-	ScanID        uuid.UUID       `json:"scan_id"`
-	RepositoryID  uuid.UUID       `json:"repository_id"`
-	Sha           string          `json:"sha"`
-	Message       string          `json:"message"`
-	AuthorName    string          `json:"author_name"`
-	AuthorEmail   string          `json:"author_email"`
-	CommittedAt   time.Time       `json:"committed_at"`
-	PrNumber      sql.NullInt32   `json:"pr_number"`
-	PrTitle       sql.NullString  `json:"pr_title"`
-	PrDescription sql.NullString  `json:"pr_description"`
-	LinkedIssues  json.RawMessage `json:"linked_issues"`
-	ChangedFiles  json.RawMessage `json:"changed_files"`
-	Diff          sql.NullString  `json:"diff"`
-	IsNoise       bool            `json:"is_noise"`
-	IsBot         bool            `json:"is_bot"`
-	IsBreaking    bool            `json:"is_breaking"`
-	Domain        sql.NullString  `json:"domain"`
+	ScanID        uuid.UUID          `json:"scan_id"`
+	RepositoryID  uuid.UUID          `json:"repository_id"`
+	Sha           string             `json:"sha"`
+	Message       string             `json:"message"`
+	AuthorName    string             `json:"author_name"`
+	AuthorEmail   string             `json:"author_email"`
+	CommittedAt   pgtype.Timestamptz `json:"committed_at"`
+	PrNumber      pgtype.Int4        `json:"pr_number"`
+	PrTitle       pgtype.Text        `json:"pr_title"`
+	PrDescription pgtype.Text        `json:"pr_description"`
+	LinkedIssues  []byte             `json:"linked_issues"`
+	ChangedFiles  []byte             `json:"changed_files"`
+	Diff          pgtype.Text        `json:"diff"`
+	IsNoise       bool               `json:"is_noise"`
+	IsBot         bool               `json:"is_bot"`
+	IsBreaking    bool               `json:"is_breaking"`
+	Domain        pgtype.Text        `json:"domain"`
 }
 
 func (q *Queries) CreateCommit(ctx context.Context, arg CreateCommitParams) (Commit, error) {
-	row := q.db.QueryRowContext(ctx, createCommit,
+	row := q.db.QueryRow(ctx, createCommit,
 		arg.ScanID,
 		arg.RepositoryID,
 		arg.Sha,
@@ -96,7 +93,7 @@ SELECT sha FROM commits WHERE scan_id = $1
 `
 
 func (q *Queries) GetCommitSHAsByScan(ctx context.Context, scanID uuid.UUID) ([]string, error) {
-	rows, err := q.db.QueryContext(ctx, getCommitSHAsByScan, scanID)
+	rows, err := q.db.Query(ctx, getCommitSHAsByScan, scanID)
 	if err != nil {
 		return nil, err
 	}
@@ -108,9 +105,6 @@ func (q *Queries) GetCommitSHAsByScan(ctx context.Context, scanID uuid.UUID) ([]
 			return nil, err
 		}
 		items = append(items, sha)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -124,7 +118,7 @@ WHERE repository_id = $1
 `
 
 func (q *Queries) GetKnownSHAsByRepository(ctx context.Context, repositoryID uuid.UUID) ([]string, error) {
-	rows, err := q.db.QueryContext(ctx, getKnownSHAsByRepository, repositoryID)
+	rows, err := q.db.Query(ctx, getKnownSHAsByRepository, repositoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -136,9 +130,6 @@ func (q *Queries) GetKnownSHAsByRepository(ctx context.Context, repositoryID uui
 			return nil, err
 		}
 		items = append(items, sha)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -153,7 +144,7 @@ ORDER BY committed_at ASC
 `
 
 func (q *Queries) ListAllCommitsByScan(ctx context.Context, scanID uuid.UUID) ([]Commit, error) {
-	rows, err := q.db.QueryContext(ctx, listAllCommitsByScan, scanID)
+	rows, err := q.db.Query(ctx, listAllCommitsByScan, scanID)
 	if err != nil {
 		return nil, err
 	}
@@ -186,9 +177,6 @@ func (q *Queries) ListAllCommitsByScan(ctx context.Context, scanID uuid.UUID) ([
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -203,7 +191,7 @@ ORDER BY committed_at ASC
 `
 
 func (q *Queries) ListCommitsByScan(ctx context.Context, scanID uuid.UUID) ([]Commit, error) {
-	rows, err := q.db.QueryContext(ctx, listCommitsByScan, scanID)
+	rows, err := q.db.Query(ctx, listCommitsByScan, scanID)
 	if err != nil {
 		return nil, err
 	}
@@ -237,9 +225,6 @@ func (q *Queries) ListCommitsByScan(ctx context.Context, scanID uuid.UUID) ([]Co
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -253,12 +238,12 @@ WHERE id = $2
 `
 
 type UpdateCommitContextParams struct {
-	CodebaseContext pqtype.NullRawMessage `json:"codebase_context"`
-	ID              uuid.UUID             `json:"id"`
+	CodebaseContext []byte    `json:"codebase_context"`
+	ID              uuid.UUID `json:"id"`
 }
 
 func (q *Queries) UpdateCommitContext(ctx context.Context, arg UpdateCommitContextParams) error {
-	_, err := q.db.ExecContext(ctx, updateCommitContext, arg.CodebaseContext, arg.ID)
+	_, err := q.db.Exec(ctx, updateCommitContext, arg.CodebaseContext, arg.ID)
 	return err
 }
 
@@ -274,16 +259,16 @@ WHERE id = $6
 `
 
 type UpdateCommitEnrichmentParams struct {
-	PrTitle       sql.NullString  `json:"pr_title"`
-	PrDescription sql.NullString  `json:"pr_description"`
-	LinkedIssues  json.RawMessage `json:"linked_issues"`
-	IsBreaking    bool            `json:"is_breaking"`
-	Domain        sql.NullString  `json:"domain"`
-	ID            uuid.UUID       `json:"id"`
+	PrTitle       pgtype.Text `json:"pr_title"`
+	PrDescription pgtype.Text `json:"pr_description"`
+	LinkedIssues  []byte      `json:"linked_issues"`
+	IsBreaking    bool        `json:"is_breaking"`
+	Domain        pgtype.Text `json:"domain"`
+	ID            uuid.UUID   `json:"id"`
 }
 
 func (q *Queries) UpdateCommitEnrichment(ctx context.Context, arg UpdateCommitEnrichmentParams) error {
-	_, err := q.db.ExecContext(ctx, updateCommitEnrichment,
+	_, err := q.db.Exec(ctx, updateCommitEnrichment,
 		arg.PrTitle,
 		arg.PrDescription,
 		arg.LinkedIssues,

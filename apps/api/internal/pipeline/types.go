@@ -1,6 +1,9 @@
 package pipeline
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type AIDepth string
 
@@ -221,20 +224,35 @@ type GeneratePluginResponse struct {
 	Error      *string `json:"error,omitempty"`
 }
 
+// AuditEntry is a single audit log record.
+type AuditEntry struct {
+	TeamID     string
+	UserID     *string
+	Action     string
+	EntityType string
+	EntityID   *string
+	Metadata   map[string]any
+}
+
 type Store interface {
 	// Scan
-	UpdateScanStatus(ctx interface{}, scanID string, status ScanStatus, errMsg *string) error
+	UpdateScanStatus(ctx context.Context, scanID string, status ScanStatus, errMsg *string) error
+	UpdateScanCounts(ctx context.Context, scanID string, commitCount, filteredCount int) error
 
 	// Commits
-	SaveCommits(ctx interface{}, commits []Commit) error
-	GetCommits(ctx interface{}, scanID string, includeNoise bool) ([]Commit, error)
-	UpdateCommit(ctx interface{}, commit Commit) error
+	SaveCommits(ctx context.Context, commits []Commit) error
+	GetCommits(ctx context.Context, scanID string, includeNoise bool) ([]Commit, error)
+	UpdateCommit(ctx context.Context, commit Commit) error
+	GetKnownSHAs(ctx context.Context, repositoryID string) (map[string]bool, error)
 
 	// Commit groups
-	SaveCommitGroups(ctx interface{}, groups []CommitGroup) error
-	GetCommitGroups(ctx interface{}, scanID string) ([]CommitGroup, error)
-	UpdateCommitGroupSummary(ctx interface{}, groupID string, summary string) error
+	SaveCommitGroups(ctx context.Context, groups []CommitGroup) error
+	GetCommitGroups(ctx context.Context, scanID string) ([]CommitGroup, error)
+	UpdateCommitGroupSummary(ctx context.Context, groupID string, summary string) error
 
 	// Audience drafts
-	SaveAudienceDraft(ctx interface{}, draft AudienceDraft) error
+	SaveAudienceDraft(ctx context.Context, draft AudienceDraft) error
+
+	// Audit
+	CreateAuditLog(ctx context.Context, entry AuditEntry) error
 }

@@ -5,14 +5,11 @@
 package db
 
 import (
-	"database/sql"
 	"database/sql/driver"
-	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/sqlc-dev/pqtype"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type DeliveryStatus string
@@ -333,143 +330,143 @@ func (ns NullUserRole) Value() (driver.Value, error) {
 }
 
 type AudienceDraft struct {
-	ID            uuid.UUID      `json:"id"`
-	ScanID        uuid.UUID      `json:"scan_id"`
-	AudienceID    string         `json:"audience_id"`
-	Tone          string         `json:"tone"`
-	Content       string         `json:"content"`
-	EditedContent sql.NullString `json:"edited_content"`
-	Status        DraftStatus    `json:"status"`
-	ApprovedBy    uuid.NullUUID  `json:"approved_by"`
-	ApprovedAt    sql.NullTime   `json:"approved_at"`
-	CreatedAt     time.Time      `json:"created_at"`
-	UpdatedAt     time.Time      `json:"updated_at"`
+	ID            uuid.UUID          `json:"id"`
+	ScanID        uuid.UUID          `json:"scan_id"`
+	AudienceID    string             `json:"audience_id"`
+	Tone          string             `json:"tone"`
+	Content       string             `json:"content"`
+	EditedContent pgtype.Text        `json:"edited_content"`
+	Status        DraftStatus        `json:"status"`
+	ApprovedBy    pgtype.UUID        `json:"approved_by"`
+	ApprovedAt    pgtype.Timestamptz `json:"approved_at"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
 type AuditLog struct {
-	ID         uuid.UUID       `json:"id"`
-	TeamID     uuid.UUID       `json:"team_id"`
-	UserID     uuid.NullUUID   `json:"user_id"`
-	Action     string          `json:"action"`
-	EntityType string          `json:"entity_type"`
-	EntityID   uuid.NullUUID   `json:"entity_id"`
-	Metadata   json.RawMessage `json:"metadata"`
-	CreatedAt  time.Time       `json:"created_at"`
+	ID         uuid.UUID          `json:"id"`
+	TeamID     uuid.UUID          `json:"team_id"`
+	UserID     pgtype.UUID        `json:"user_id"`
+	Action     string             `json:"action"`
+	EntityType string             `json:"entity_type"`
+	EntityID   pgtype.UUID        `json:"entity_id"`
+	Metadata   []byte             `json:"metadata"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
 type Commit struct {
-	ID              uuid.UUID             `json:"id"`
-	ScanID          uuid.UUID             `json:"scan_id"`
-	RepositoryID    uuid.UUID             `json:"repository_id"`
-	Sha             string                `json:"sha"`
-	Message         string                `json:"message"`
-	AuthorName      string                `json:"author_name"`
-	AuthorEmail     string                `json:"author_email"`
-	CommittedAt     time.Time             `json:"committed_at"`
-	PrNumber        sql.NullInt32         `json:"pr_number"`
-	PrTitle         sql.NullString        `json:"pr_title"`
-	PrDescription   sql.NullString        `json:"pr_description"`
-	LinkedIssues    json.RawMessage       `json:"linked_issues"`
-	ChangedFiles    json.RawMessage       `json:"changed_files"`
-	Diff            sql.NullString        `json:"diff"`
-	CodebaseContext pqtype.NullRawMessage `json:"codebase_context"`
-	IsNoise         bool                  `json:"is_noise"`
-	IsBot           bool                  `json:"is_bot"`
-	IsBreaking      bool                  `json:"is_breaking"`
-	Domain          sql.NullString        `json:"domain"`
-	CreatedAt       time.Time             `json:"created_at"`
+	ID              uuid.UUID          `json:"id"`
+	ScanID          uuid.UUID          `json:"scan_id"`
+	RepositoryID    uuid.UUID          `json:"repository_id"`
+	Sha             string             `json:"sha"`
+	Message         string             `json:"message"`
+	AuthorName      string             `json:"author_name"`
+	AuthorEmail     string             `json:"author_email"`
+	CommittedAt     pgtype.Timestamptz `json:"committed_at"`
+	PrNumber        pgtype.Int4        `json:"pr_number"`
+	PrTitle         pgtype.Text        `json:"pr_title"`
+	PrDescription   pgtype.Text        `json:"pr_description"`
+	LinkedIssues    []byte             `json:"linked_issues"`
+	ChangedFiles    []byte             `json:"changed_files"`
+	Diff            pgtype.Text        `json:"diff"`
+	CodebaseContext []byte             `json:"codebase_context"`
+	IsNoise         bool               `json:"is_noise"`
+	IsBot           bool               `json:"is_bot"`
+	IsBreaking      bool               `json:"is_breaking"`
+	Domain          pgtype.Text        `json:"domain"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 }
 
 type CommitGroup struct {
-	ID        uuid.UUID      `json:"id"`
-	ScanID    uuid.UUID      `json:"scan_id"`
-	Label     string         `json:"label"`
-	CommitIds []uuid.UUID    `json:"commit_ids"`
-	GroupType GroupType      `json:"group_type"`
-	Summary   sql.NullString `json:"summary"`
-	CreatedAt time.Time      `json:"created_at"`
+	ID        uuid.UUID          `json:"id"`
+	ScanID    uuid.UUID          `json:"scan_id"`
+	Label     string             `json:"label"`
+	CommitIds []uuid.UUID        `json:"commit_ids"`
+	GroupType GroupType          `json:"group_type"`
+	Summary   pgtype.Text        `json:"summary"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type Delivery struct {
-	ID           uuid.UUID             `json:"id"`
-	DraftID      uuid.UUID             `json:"draft_id"`
-	OutputPlugin string                `json:"output_plugin"`
-	Status       DeliveryStatus        `json:"status"`
-	Response     pqtype.NullRawMessage `json:"response"`
-	AttemptCount int32                 `json:"attempt_count"`
-	DeliveredAt  sql.NullTime          `json:"delivered_at"`
-	CreatedAt    time.Time             `json:"created_at"`
-	UpdatedAt    time.Time             `json:"updated_at"`
+	ID           uuid.UUID          `json:"id"`
+	DraftID      uuid.UUID          `json:"draft_id"`
+	OutputPlugin string             `json:"output_plugin"`
+	Status       DeliveryStatus     `json:"status"`
+	Response     []byte             `json:"response"`
+	AttemptCount int32              `json:"attempt_count"`
+	DeliveredAt  pgtype.Timestamptz `json:"delivered_at"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
 type DraftComment struct {
-	ID        uuid.UUID `json:"id"`
-	DraftID   uuid.UUID `json:"draft_id"`
-	UserID    uuid.UUID `json:"user_id"`
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        uuid.UUID          `json:"id"`
+	DraftID   uuid.UUID          `json:"draft_id"`
+	UserID    uuid.UUID          `json:"user_id"`
+	Content   string             `json:"content"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type Repository struct {
-	ID            uuid.UUID       `json:"id"`
-	TeamID        uuid.UUID       `json:"team_id"`
-	Provider      GitProvider     `json:"provider"`
-	ProviderID    string          `json:"provider_id"`
-	Name          string          `json:"name"`
-	FullName      string          `json:"full_name"`
-	Url           string          `json:"url"`
-	DefaultBranch string          `json:"default_branch"`
-	AccessToken   string          `json:"access_token"`
-	WebhookSecret sql.NullString  `json:"webhook_secret"`
-	Config        json.RawMessage `json:"config"`
-	IsActive      bool            `json:"is_active"`
-	LastScannedAt sql.NullTime    `json:"last_scanned_at"`
-	CreatedAt     time.Time       `json:"created_at"`
-	UpdatedAt     time.Time       `json:"updated_at"`
+	ID            uuid.UUID          `json:"id"`
+	TeamID        uuid.UUID          `json:"team_id"`
+	Provider      GitProvider        `json:"provider"`
+	ProviderID    string             `json:"provider_id"`
+	Name          string             `json:"name"`
+	FullName      string             `json:"full_name"`
+	Url           string             `json:"url"`
+	DefaultBranch string             `json:"default_branch"`
+	AccessToken   string             `json:"access_token"`
+	WebhookSecret pgtype.Text        `json:"webhook_secret"`
+	Config        []byte             `json:"config"`
+	IsActive      bool               `json:"is_active"`
+	LastScannedAt pgtype.Timestamptz `json:"last_scanned_at"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Scan struct {
-	ID                uuid.UUID       `json:"id"`
-	TeamID            uuid.UUID       `json:"team_id"`
-	RepositoryID      uuid.UUID       `json:"repository_id"`
-	Status            ScanStatus      `json:"status"`
-	TriggeredBy       ScanTrigger     `json:"triggered_by"`
-	TriggeredByUserID uuid.NullUUID   `json:"triggered_by_user_id"`
-	ScanFrom          time.Time       `json:"scan_from"`
-	ScanTo            time.Time       `json:"scan_to"`
-	CommitCount       int32           `json:"commit_count"`
-	FilteredCount     int32           `json:"filtered_count"`
-	Error             sql.NullString  `json:"error"`
-	ConfigSnapshot    json.RawMessage `json:"config_snapshot"`
-	CreatedAt         time.Time       `json:"created_at"`
-	UpdatedAt         time.Time       `json:"updated_at"`
+	ID                uuid.UUID          `json:"id"`
+	TeamID            uuid.UUID          `json:"team_id"`
+	RepositoryID      uuid.UUID          `json:"repository_id"`
+	Status            ScanStatus         `json:"status"`
+	TriggeredBy       ScanTrigger        `json:"triggered_by"`
+	TriggeredByUserID pgtype.UUID        `json:"triggered_by_user_id"`
+	ScanFrom          pgtype.Timestamptz `json:"scan_from"`
+	ScanTo            pgtype.Timestamptz `json:"scan_to"`
+	CommitCount       int32              `json:"commit_count"`
+	FilteredCount     int32              `json:"filtered_count"`
+	Error             pgtype.Text        `json:"error"`
+	ConfigSnapshot    []byte             `json:"config_snapshot"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Session struct {
-	ID        uuid.UUID `json:"id"`
-	UserID    uuid.UUID `json:"user_id"`
-	TokenHash string    `json:"token_hash"`
-	ExpiresAt time.Time `json:"expires_at"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        uuid.UUID          `json:"id"`
+	UserID    uuid.UUID          `json:"user_id"`
+	TokenHash string             `json:"token_hash"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type Team struct {
-	ID        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	Slug      string    `json:"slug"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        uuid.UUID          `json:"id"`
+	Name      string             `json:"name"`
+	Slug      string             `json:"slug"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 type User struct {
-	ID         uuid.UUID      `json:"id"`
-	TeamID     uuid.UUID      `json:"team_id"`
-	Email      string         `json:"email"`
-	Name       string         `json:"name"`
-	AvatarUrl  sql.NullString `json:"avatar_url"`
-	Role       UserRole       `json:"role"`
-	Provider   string         `json:"provider"`
-	ProviderID string         `json:"provider_id"`
-	CreatedAt  time.Time      `json:"created_at"`
-	UpdatedAt  time.Time      `json:"updated_at"`
+	ID         uuid.UUID          `json:"id"`
+	TeamID     uuid.UUID          `json:"team_id"`
+	Email      string             `json:"email"`
+	Name       string             `json:"name"`
+	AvatarUrl  pgtype.Text        `json:"avatar_url"`
+	Role       UserRole           `json:"role"`
+	Provider   string             `json:"provider"`
+	ProviderID string             `json:"provider_id"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 }

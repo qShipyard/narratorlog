@@ -7,9 +7,9 @@ package db
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createAuditLog = `-- name: CreateAuditLog :exec
@@ -18,16 +18,16 @@ VALUES ($1, $2, $3, $4, $5, $6)
 `
 
 type CreateAuditLogParams struct {
-	TeamID     uuid.UUID       `json:"team_id"`
-	UserID     uuid.NullUUID   `json:"user_id"`
-	Action     string          `json:"action"`
-	EntityType string          `json:"entity_type"`
-	EntityID   uuid.NullUUID   `json:"entity_id"`
-	Metadata   json.RawMessage `json:"metadata"`
+	TeamID     uuid.UUID   `json:"team_id"`
+	UserID     pgtype.UUID `json:"user_id"`
+	Action     string      `json:"action"`
+	EntityType string      `json:"entity_type"`
+	EntityID   pgtype.UUID `json:"entity_id"`
+	Metadata   []byte      `json:"metadata"`
 }
 
 func (q *Queries) CreateAuditLog(ctx context.Context, arg CreateAuditLogParams) error {
-	_, err := q.db.ExecContext(ctx, createAuditLog,
+	_, err := q.db.Exec(ctx, createAuditLog,
 		arg.TeamID,
 		arg.UserID,
 		arg.Action,
@@ -45,12 +45,12 @@ ORDER BY created_at DESC
 `
 
 type ListAuditLogByEntityParams struct {
-	EntityType string        `json:"entity_type"`
-	EntityID   uuid.NullUUID `json:"entity_id"`
+	EntityType string      `json:"entity_type"`
+	EntityID   pgtype.UUID `json:"entity_id"`
 }
 
 func (q *Queries) ListAuditLogByEntity(ctx context.Context, arg ListAuditLogByEntityParams) ([]AuditLog, error) {
-	rows, err := q.db.QueryContext(ctx, listAuditLogByEntity, arg.EntityType, arg.EntityID)
+	rows, err := q.db.Query(ctx, listAuditLogByEntity, arg.EntityType, arg.EntityID)
 	if err != nil {
 		return nil, err
 	}
@@ -71,9 +71,6 @@ func (q *Queries) ListAuditLogByEntity(ctx context.Context, arg ListAuditLogByEn
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -95,7 +92,7 @@ type ListAuditLogByTeamParams struct {
 }
 
 func (q *Queries) ListAuditLogByTeam(ctx context.Context, arg ListAuditLogByTeamParams) ([]AuditLog, error) {
-	rows, err := q.db.QueryContext(ctx, listAuditLogByTeam, arg.TeamID, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listAuditLogByTeam, arg.TeamID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -116,9 +113,6 @@ func (q *Queries) ListAuditLogByTeam(ctx context.Context, arg ListAuditLogByTeam
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
