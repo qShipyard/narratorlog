@@ -7,11 +7,9 @@ package db
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
-	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const countPendingApprovalsByTeam = `-- name: CountPendingApprovalsByTeam :one
@@ -20,7 +18,7 @@ WHERE team_id = $1 AND status = 'awaiting_approval'
 `
 
 func (q *Queries) CountPendingApprovalsByTeam(ctx context.Context, teamID uuid.UUID) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countPendingApprovalsByTeam, teamID)
+	row := q.db.QueryRow(ctx, countPendingApprovalsByTeam, teamID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -36,18 +34,18 @@ RETURNING id, team_id, repository_id, status, triggered_by, triggered_by_user_id
 `
 
 type CreateScanParams struct {
-	TeamID            uuid.UUID       `json:"team_id"`
-	RepositoryID      uuid.UUID       `json:"repository_id"`
-	Status            ScanStatus      `json:"status"`
-	TriggeredBy       ScanTrigger     `json:"triggered_by"`
-	TriggeredByUserID uuid.NullUUID   `json:"triggered_by_user_id"`
-	ScanFrom          time.Time       `json:"scan_from"`
-	ScanTo            time.Time       `json:"scan_to"`
-	ConfigSnapshot    json.RawMessage `json:"config_snapshot"`
+	TeamID            uuid.UUID          `json:"team_id"`
+	RepositoryID      uuid.UUID          `json:"repository_id"`
+	Status            ScanStatus         `json:"status"`
+	TriggeredBy       ScanTrigger        `json:"triggered_by"`
+	TriggeredByUserID pgtype.UUID        `json:"triggered_by_user_id"`
+	ScanFrom          pgtype.Timestamptz `json:"scan_from"`
+	ScanTo            pgtype.Timestamptz `json:"scan_to"`
+	ConfigSnapshot    []byte             `json:"config_snapshot"`
 }
 
 func (q *Queries) CreateScan(ctx context.Context, arg CreateScanParams) (Scan, error) {
-	row := q.db.QueryRowContext(ctx, createScan,
+	row := q.db.QueryRow(ctx, createScan,
 		arg.TeamID,
 		arg.RepositoryID,
 		arg.Status,
@@ -82,7 +80,7 @@ SELECT id, team_id, repository_id, status, triggered_by, triggered_by_user_id, s
 `
 
 func (q *Queries) GetScanByID(ctx context.Context, id uuid.UUID) (Scan, error) {
-	row := q.db.QueryRowContext(ctx, getScanByID, id)
+	row := q.db.QueryRow(ctx, getScanByID, id)
 	var i Scan
 	err := row.Scan(
 		&i.ID,
@@ -117,7 +115,7 @@ type ListScansByRepositoryParams struct {
 }
 
 func (q *Queries) ListScansByRepository(ctx context.Context, arg ListScansByRepositoryParams) ([]Scan, error) {
-	rows, err := q.db.QueryContext(ctx, listScansByRepository, arg.RepositoryID, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listScansByRepository, arg.RepositoryID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -144,9 +142,6 @@ func (q *Queries) ListScansByRepository(ctx context.Context, arg ListScansByRepo
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -168,7 +163,7 @@ type ListScansByTeamParams struct {
 }
 
 func (q *Queries) ListScansByTeam(ctx context.Context, arg ListScansByTeamParams) ([]Scan, error) {
-	rows, err := q.db.QueryContext(ctx, listScansByTeam, arg.TeamID, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listScansByTeam, arg.TeamID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -196,9 +191,6 @@ func (q *Queries) ListScansByTeam(ctx context.Context, arg ListScansByTeamParams
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -218,7 +210,7 @@ type UpdateScanCountsParams struct {
 }
 
 func (q *Queries) UpdateScanCounts(ctx context.Context, arg UpdateScanCountsParams) error {
-	_, err := q.db.ExecContext(ctx, updateScanCounts, arg.CommitCount, arg.FilteredCount, arg.ID)
+	_, err := q.db.Exec(ctx, updateScanCounts, arg.CommitCount, arg.FilteredCount, arg.ID)
 	return err
 }
 
@@ -234,7 +226,7 @@ type UpdateScanStatusParams struct {
 }
 
 func (q *Queries) UpdateScanStatus(ctx context.Context, arg UpdateScanStatusParams) error {
-	_, err := q.db.ExecContext(ctx, updateScanStatus, arg.Status, arg.ID)
+	_, err := q.db.Exec(ctx, updateScanStatus, arg.Status, arg.ID)
 	return err
 }
 
@@ -245,12 +237,12 @@ WHERE id = $3
 `
 
 type UpdateScanStatusWithErrorParams struct {
-	Status ScanStatus     `json:"status"`
-	Error  sql.NullString `json:"error"`
-	ID     uuid.UUID      `json:"id"`
+	Status ScanStatus  `json:"status"`
+	Error  pgtype.Text `json:"error"`
+	ID     uuid.UUID   `json:"id"`
 }
 
 func (q *Queries) UpdateScanStatusWithError(ctx context.Context, arg UpdateScanStatusWithErrorParams) error {
-	_, err := q.db.ExecContext(ctx, updateScanStatusWithError, arg.Status, arg.Error, arg.ID)
+	_, err := q.db.Exec(ctx, updateScanStatusWithError, arg.Status, arg.Error, arg.ID)
 	return err
 }

@@ -23,7 +23,7 @@ type CreateTeamParams struct {
 }
 
 func (q *Queries) CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, error) {
-	row := q.db.QueryRowContext(ctx, createTeam, arg.Name, arg.Slug)
+	row := q.db.QueryRow(ctx, createTeam, arg.Name, arg.Slug)
 	var i Team
 	err := row.Scan(
 		&i.ID,
@@ -41,7 +41,7 @@ WHERE id = $1
 `
 
 func (q *Queries) GetTeamByID(ctx context.Context, id uuid.UUID) (Team, error) {
-	row := q.db.QueryRowContext(ctx, getTeamByID, id)
+	row := q.db.QueryRow(ctx, getTeamByID, id)
 	var i Team
 	err := row.Scan(
 		&i.ID,
@@ -59,7 +59,7 @@ WHERE slug = $1
 `
 
 func (q *Queries) GetTeamBySlug(ctx context.Context, slug string) (Team, error) {
-	row := q.db.QueryRowContext(ctx, getTeamBySlug, slug)
+	row := q.db.QueryRow(ctx, getTeamBySlug, slug)
 	var i Team
 	err := row.Scan(
 		&i.ID,
@@ -84,7 +84,7 @@ type UpdateTeamParams struct {
 }
 
 func (q *Queries) UpdateTeam(ctx context.Context, arg UpdateTeamParams) (Team, error) {
-	row := q.db.QueryRowContext(ctx, updateTeam, arg.Name, arg.ID)
+	row := q.db.QueryRow(ctx, updateTeam, arg.Name, arg.ID)
 	var i Team
 	err := row.Scan(
 		&i.ID,

@@ -7,9 +7,9 @@ package db
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createUser = `-- name: CreateUser :one
@@ -19,17 +19,17 @@ RETURNING id, team_id, email, name, avatar_url, role, provider, provider_id, cre
 `
 
 type CreateUserParams struct {
-	TeamID     uuid.UUID      `json:"team_id"`
-	Email      string         `json:"email"`
-	Name       string         `json:"name"`
-	AvatarUrl  sql.NullString `json:"avatar_url"`
-	Role       UserRole       `json:"role"`
-	Provider   string         `json:"provider"`
-	ProviderID string         `json:"provider_id"`
+	TeamID     uuid.UUID   `json:"team_id"`
+	Email      string      `json:"email"`
+	Name       string      `json:"name"`
+	AvatarUrl  pgtype.Text `json:"avatar_url"`
+	Role       UserRole    `json:"role"`
+	Provider   string      `json:"provider"`
+	ProviderID string      `json:"provider_id"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, createUser,
+	row := q.db.QueryRow(ctx, createUser,
 		arg.TeamID,
 		arg.Email,
 		arg.Name,
@@ -59,7 +59,7 @@ DELETE FROM users WHERE id = $1
 `
 
 func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, deleteUser, id)
+	_, err := q.db.Exec(ctx, deleteUser, id)
 	return err
 }
 
@@ -69,7 +69,7 @@ WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
+	row := q.db.QueryRow(ctx, getUserByEmail, email)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -92,7 +92,7 @@ WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByID, id)
+	row := q.db.QueryRow(ctx, getUserByID, id)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -120,7 +120,7 @@ type GetUserByProviderParams struct {
 }
 
 func (q *Queries) GetUserByProvider(ctx context.Context, arg GetUserByProviderParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByProvider, arg.Provider, arg.ProviderID)
+	row := q.db.QueryRow(ctx, getUserByProvider, arg.Provider, arg.ProviderID)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -144,7 +144,7 @@ ORDER BY created_at ASC
 `
 
 func (q *Queries) ListUsersByTeam(ctx context.Context, teamID uuid.UUID) ([]User, error) {
-	rows, err := q.db.QueryContext(ctx, listUsersByTeam, teamID)
+	rows, err := q.db.Query(ctx, listUsersByTeam, teamID)
 	if err != nil {
 		return nil, err
 	}
@@ -168,9 +168,6 @@ func (q *Queries) ListUsersByTeam(ctx context.Context, teamID uuid.UUID) ([]User
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -190,7 +187,7 @@ type UpdateUserRoleParams struct {
 }
 
 func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, updateUserRole, arg.Role, arg.ID)
+	row := q.db.QueryRow(ctx, updateUserRole, arg.Role, arg.ID)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -219,17 +216,17 @@ RETURNING id, team_id, email, name, avatar_url, role, provider, provider_id, cre
 `
 
 type UpsertUserParams struct {
-	TeamID     uuid.UUID      `json:"team_id"`
-	Email      string         `json:"email"`
-	Name       string         `json:"name"`
-	AvatarUrl  sql.NullString `json:"avatar_url"`
-	Role       UserRole       `json:"role"`
-	Provider   string         `json:"provider"`
-	ProviderID string         `json:"provider_id"`
+	TeamID     uuid.UUID   `json:"team_id"`
+	Email      string      `json:"email"`
+	Name       string      `json:"name"`
+	AvatarUrl  pgtype.Text `json:"avatar_url"`
+	Role       UserRole    `json:"role"`
+	Provider   string      `json:"provider"`
+	ProviderID string      `json:"provider_id"`
 }
 
 func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, upsertUser,
+	row := q.db.QueryRow(ctx, upsertUser,
 		arg.TeamID,
 		arg.Email,
 		arg.Name,

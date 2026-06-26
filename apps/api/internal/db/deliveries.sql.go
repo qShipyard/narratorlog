@@ -9,7 +9,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/sqlc-dev/pqtype"
 )
 
 const createDelivery = `-- name: CreateDelivery :one
@@ -24,7 +23,7 @@ type CreateDeliveryParams struct {
 }
 
 func (q *Queries) CreateDelivery(ctx context.Context, arg CreateDeliveryParams) (Delivery, error) {
-	row := q.db.QueryRowContext(ctx, createDelivery, arg.DraftID, arg.OutputPlugin)
+	row := q.db.QueryRow(ctx, createDelivery, arg.DraftID, arg.OutputPlugin)
 	var i Delivery
 	err := row.Scan(
 		&i.ID,
@@ -47,7 +46,7 @@ ORDER BY created_at ASC
 `
 
 func (q *Queries) ListDeliveriesByDraft(ctx context.Context, draftID uuid.UUID) ([]Delivery, error) {
-	rows, err := q.db.QueryContext(ctx, listDeliveriesByDraft, draftID)
+	rows, err := q.db.Query(ctx, listDeliveriesByDraft, draftID)
 	if err != nil {
 		return nil, err
 	}
@@ -70,9 +69,6 @@ func (q *Queries) ListDeliveriesByDraft(ctx context.Context, draftID uuid.UUID) 
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -90,12 +86,12 @@ WHERE id = $2
 `
 
 type UpdateDeliveryFailedParams struct {
-	Response pqtype.NullRawMessage `json:"response"`
-	ID       uuid.UUID             `json:"id"`
+	Response []byte    `json:"response"`
+	ID       uuid.UUID `json:"id"`
 }
 
 func (q *Queries) UpdateDeliveryFailed(ctx context.Context, arg UpdateDeliveryFailedParams) error {
-	_, err := q.db.ExecContext(ctx, updateDeliveryFailed, arg.Response, arg.ID)
+	_, err := q.db.Exec(ctx, updateDeliveryFailed, arg.Response, arg.ID)
 	return err
 }
 
@@ -111,11 +107,11 @@ WHERE id = $2
 `
 
 type UpdateDeliverySuccessParams struct {
-	Response pqtype.NullRawMessage `json:"response"`
-	ID       uuid.UUID             `json:"id"`
+	Response []byte    `json:"response"`
+	ID       uuid.UUID `json:"id"`
 }
 
 func (q *Queries) UpdateDeliverySuccess(ctx context.Context, arg UpdateDeliverySuccessParams) error {
-	_, err := q.db.ExecContext(ctx, updateDeliverySuccess, arg.Response, arg.ID)
+	_, err := q.db.Exec(ctx, updateDeliverySuccess, arg.Response, arg.ID)
 	return err
 }

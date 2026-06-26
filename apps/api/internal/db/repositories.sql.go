@@ -7,10 +7,9 @@ package db
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createRepository = `-- name: CreateRepository :one
@@ -23,20 +22,20 @@ RETURNING id, team_id, provider, provider_id, name, full_name, url, default_bran
 `
 
 type CreateRepositoryParams struct {
-	TeamID        uuid.UUID       `json:"team_id"`
-	Provider      GitProvider     `json:"provider"`
-	ProviderID    string          `json:"provider_id"`
-	Name          string          `json:"name"`
-	FullName      string          `json:"full_name"`
-	Url           string          `json:"url"`
-	DefaultBranch string          `json:"default_branch"`
-	AccessToken   string          `json:"access_token"`
-	WebhookSecret sql.NullString  `json:"webhook_secret"`
-	Config        json.RawMessage `json:"config"`
+	TeamID        uuid.UUID   `json:"team_id"`
+	Provider      GitProvider `json:"provider"`
+	ProviderID    string      `json:"provider_id"`
+	Name          string      `json:"name"`
+	FullName      string      `json:"full_name"`
+	Url           string      `json:"url"`
+	DefaultBranch string      `json:"default_branch"`
+	AccessToken   string      `json:"access_token"`
+	WebhookSecret pgtype.Text `json:"webhook_secret"`
+	Config        []byte      `json:"config"`
 }
 
 func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error) {
-	row := q.db.QueryRowContext(ctx, createRepository,
+	row := q.db.QueryRow(ctx, createRepository,
 		arg.TeamID,
 		arg.Provider,
 		arg.ProviderID,
@@ -76,7 +75,7 @@ WHERE id = $1
 `
 
 func (q *Queries) DeactivateRepository(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, deactivateRepository, id)
+	_, err := q.db.Exec(ctx, deactivateRepository, id)
 	return err
 }
 
@@ -86,7 +85,7 @@ WHERE id = $1
 `
 
 func (q *Queries) GetRepositoryByID(ctx context.Context, id uuid.UUID) (Repository, error) {
-	row := q.db.QueryRowContext(ctx, getRepositoryByID, id)
+	row := q.db.QueryRow(ctx, getRepositoryByID, id)
 	var i Repository
 	err := row.Scan(
 		&i.ID,
@@ -120,7 +119,7 @@ type GetRepositoryByProviderIDParams struct {
 }
 
 func (q *Queries) GetRepositoryByProviderID(ctx context.Context, arg GetRepositoryByProviderIDParams) (Repository, error) {
-	row := q.db.QueryRowContext(ctx, getRepositoryByProviderID, arg.TeamID, arg.Provider, arg.ProviderID)
+	row := q.db.QueryRow(ctx, getRepositoryByProviderID, arg.TeamID, arg.Provider, arg.ProviderID)
 	var i Repository
 	err := row.Scan(
 		&i.ID,
@@ -149,7 +148,7 @@ ORDER BY created_at ASC
 `
 
 func (q *Queries) ListRepositoriesByTeam(ctx context.Context, teamID uuid.UUID) ([]Repository, error) {
-	rows, err := q.db.QueryContext(ctx, listRepositoriesByTeam, teamID)
+	rows, err := q.db.Query(ctx, listRepositoriesByTeam, teamID)
 	if err != nil {
 		return nil, err
 	}
@@ -178,9 +177,6 @@ func (q *Queries) ListRepositoriesByTeam(ctx context.Context, teamID uuid.UUID) 
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -195,12 +191,12 @@ RETURNING id, team_id, provider, provider_id, name, full_name, url, default_bran
 `
 
 type UpdateRepositoryConfigParams struct {
-	Config json.RawMessage `json:"config"`
-	ID     uuid.UUID       `json:"id"`
+	Config []byte    `json:"config"`
+	ID     uuid.UUID `json:"id"`
 }
 
 func (q *Queries) UpdateRepositoryConfig(ctx context.Context, arg UpdateRepositoryConfigParams) (Repository, error) {
-	row := q.db.QueryRowContext(ctx, updateRepositoryConfig, arg.Config, arg.ID)
+	row := q.db.QueryRow(ctx, updateRepositoryConfig, arg.Config, arg.ID)
 	var i Repository
 	err := row.Scan(
 		&i.ID,
@@ -229,6 +225,6 @@ WHERE id = $1
 `
 
 func (q *Queries) UpdateRepositoryLastScanned(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, updateRepositoryLastScanned, id)
+	_, err := q.db.Exec(ctx, updateRepositoryLastScanned, id)
 	return err
 }

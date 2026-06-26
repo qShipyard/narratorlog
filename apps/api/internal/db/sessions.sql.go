@@ -7,9 +7,9 @@ package db
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createSession = `-- name: CreateSession :one
@@ -19,13 +19,13 @@ RETURNING id, user_id, token_hash, expires_at, created_at
 `
 
 type CreateSessionParams struct {
-	UserID    uuid.UUID `json:"user_id"`
-	TokenHash string    `json:"token_hash"`
-	ExpiresAt time.Time `json:"expires_at"`
+	UserID    uuid.UUID          `json:"user_id"`
+	TokenHash string             `json:"token_hash"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
 }
 
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error) {
-	row := q.db.QueryRowContext(ctx, createSession, arg.UserID, arg.TokenHash, arg.ExpiresAt)
+	row := q.db.QueryRow(ctx, createSession, arg.UserID, arg.TokenHash, arg.ExpiresAt)
 	var i Session
 	err := row.Scan(
 		&i.ID,
@@ -42,7 +42,7 @@ DELETE FROM sessions WHERE expires_at <= now()
 `
 
 func (q *Queries) DeleteExpiredSessions(ctx context.Context) error {
-	_, err := q.db.ExecContext(ctx, deleteExpiredSessions)
+	_, err := q.db.Exec(ctx, deleteExpiredSessions)
 	return err
 }
 
@@ -51,7 +51,7 @@ DELETE FROM sessions WHERE token_hash = $1
 `
 
 func (q *Queries) DeleteSession(ctx context.Context, tokenHash string) error {
-	_, err := q.db.ExecContext(ctx, deleteSession, tokenHash)
+	_, err := q.db.Exec(ctx, deleteSession, tokenHash)
 	return err
 }
 
@@ -60,7 +60,7 @@ DELETE FROM sessions WHERE user_id = $1
 `
 
 func (q *Queries) DeleteUserSessions(ctx context.Context, userID uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, deleteUserSessions, userID)
+	_, err := q.db.Exec(ctx, deleteUserSessions, userID)
 	return err
 }
 
@@ -73,18 +73,18 @@ WHERE s.token_hash = $1
 `
 
 type GetSessionByTokenHashRow struct {
-	ID        uuid.UUID `json:"id"`
-	UserID    uuid.UUID `json:"user_id"`
-	TokenHash string    `json:"token_hash"`
-	ExpiresAt time.Time `json:"expires_at"`
-	CreatedAt time.Time `json:"created_at"`
-	UserID_2  uuid.UUID `json:"user_id_2"`
-	TeamID    uuid.UUID `json:"team_id"`
-	Role      UserRole  `json:"role"`
+	ID        uuid.UUID          `json:"id"`
+	UserID    uuid.UUID          `json:"user_id"`
+	TokenHash string             `json:"token_hash"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UserID_2  uuid.UUID          `json:"user_id_2"`
+	TeamID    uuid.UUID          `json:"team_id"`
+	Role      UserRole           `json:"role"`
 }
 
 func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash string) (GetSessionByTokenHashRow, error) {
-	row := q.db.QueryRowContext(ctx, getSessionByTokenHash, tokenHash)
+	row := q.db.QueryRow(ctx, getSessionByTokenHash, tokenHash)
 	var i GetSessionByTokenHashRow
 	err := row.Scan(
 		&i.ID,
