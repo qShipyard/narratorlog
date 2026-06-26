@@ -116,6 +116,16 @@ export interface Pagination {
   total: number
 }
 
+export interface AvailableRepo {
+  provider_id: string
+  full_name: string
+  name: string
+  url: string
+  default_branch: string
+  private: boolean
+  already_connected: boolean
+}
+
 // ─── API calls ────────────────────────────────────────────────────────────────
 
 export const setupApi = {
@@ -137,9 +147,15 @@ export const authApi = {
 
 export const reposApi = {
   list: () => api.get<{ data: Repository[] }>('/api/v1/repos'),
-  available: () => api.get<{ data: Repository[] }>('/api/v1/repos/available'),
-  connect: (data: { provider: string; provider_id: string; full_name: string; url: string; default_branch: string }) =>
-    api.post<Repository>('/api/v1/repos', data),
+  available: () => api.get<{ data: AvailableRepo[] }>('/api/v1/repos/available'),
+  connect: (data: {
+    provider: string
+    provider_id: string
+    full_name: string
+    url: string
+    default_branch: string
+    access_token: string
+  }) => api.post<Repository>('/api/v1/repos', data),
   get: (id: string) => api.get<Repository>(`/api/v1/repos/${id}`),
   update: (id: string, config: Record<string, unknown>) =>
     api.patch<Repository>(`/api/v1/repos/${id}`, { config }),

@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -57,12 +58,12 @@ func (h *Handler) ConnectRepo(c *gin.Context) {
 	}
 
 	var req struct {
-		Provider      string `json:"provider"       binding:"required"`
-		ProviderID    string `json:"provider_id"    binding:"required"`
-		FullName      string `json:"full_name"      binding:"required"`
-		URL           string `json:"url"            binding:"required"`
+		Provider      string `json:"provider"      binding:"required"`
+		ProviderID    string `json:"provider_id"   binding:"required"`
+		FullName      string `json:"full_name"     binding:"required"`
+		URL           string `json:"url"           binding:"required"`
 		DefaultBranch string `json:"default_branch"`
-		AccessToken   string `json:"access_token"   binding:"required"`
+		AccessToken   string `json:"access_token"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -74,13 +75,32 @@ func (h *Handler) ConnectRepo(c *gin.Context) {
 		req.DefaultBranch = "main"
 	}
 
+	// If access_token not in body, try the gh_token cookie (set after GitHub OAuth)
+	if req.AccessToken == "" && req.Provider == "github" {
+		encryptedToken, err := c.Cookie("gh_token")
+		if err != nil {
+			errorResponse(c, http.StatusBadRequest, "NO_ACCESS_TOKEN", "Access token required.")
+			return
+		}
+		decrypted, err := h.encryptor.Decrypt(encryptedToken)
+		if err != nil {
+			errorResponse(c, http.StatusUnauthorized, "INVALID_TOKEN", "Invalid GitHub token.")
+			return
+		}
+		req.AccessToken = decrypted
+	}
+
+	if req.AccessToken == "" {
+		errorResponse(c, http.StatusBadRequest, "NO_ACCESS_TOKEN", "Access token required.")
+		return
+	}
+
 	encryptedToken, err := h.encryptor.Encrypt(req.AccessToken)
 	if err != nil {
 		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to encrypt token.")
 		return
 	}
 
-	// Generate webhook secret
 	webhookSecret, err := generateWebhookSecret()
 	if err != nil {
 		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to generate webhook secret.")
@@ -106,7 +126,6 @@ func (h *Handler) ConnectRepo(c *gin.Context) {
 		return
 	}
 
-	// Register webhook with GitHub (best-effort — don't fail if this errors)
 	if h.github != nil && req.Provider == "github" {
 		parts := splitFullName(req.FullName)
 		if len(parts) == 2 {
@@ -118,8 +137,6 @@ func (h *Handler) ConnectRepo(c *gin.Context) {
 				webhookURL,
 				webhookSecret,
 			); err != nil {
-				// Log but don't fail — webhook registration failure isn't critical
-				// Teams can still trigger scans manually
 				c.Header("X-Webhook-Warning", "Webhook registration failed: "+err.Error())
 			}
 		}
@@ -182,7 +199,6 @@ func (h *Handler) ListAvailableRepos(c *gin.Context) {
 		return
 	}
 
-	// Get encrypted token from cookie
 	encryptedToken, err := c.Cookie("gh_token")
 	if err != nil {
 		errorResponse(c, http.StatusUnauthorized, "NO_GITHUB_TOKEN", "GitHub not connected. Visit /auth/github first.")
@@ -201,7 +217,6 @@ func (h *Handler) ListAvailableRepos(c *gin.Context) {
 		return
 	}
 
-	// Get already connected repos to mark them
 	teamID, _ := uuid.Parse(c.GetString("team_id"))
 	connected, _ := h.queries.ListRepositoriesByTeam(c.Request.Context(), teamID)
 	connectedIDs := make(map[string]bool)
@@ -237,6 +252,10 @@ func repoToJSON(r db.Repository) gin.H {
 		"last_scanned_at": r.LastScannedAt,
 		"config":          r.Config,
 	}
+}
+
+func marshalJSON(v any) ([]byte, error) {
+	return json.Marshal(v)
 }
 
 func generateWebhookSecret() (string, error) {
