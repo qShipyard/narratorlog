@@ -6,6 +6,14 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 
+interface TeamMember {
+  id: string
+  name: string
+  email: string
+  role: string
+  avatar_url?: string
+}
+
 export default function TeamPage() {
   const { data } = useQuery({
     queryKey: ['team-members'],
@@ -24,7 +32,7 @@ export default function TeamPage() {
       </div>
 
       <div className="space-y-2">
-        {members.map((member: any) => (
+        {members.map((member: TeamMember) => (
           <Card key={member.id}>
             <CardContent className="py-4 flex items-center gap-4">
               <Avatar className="h-8 w-8">
