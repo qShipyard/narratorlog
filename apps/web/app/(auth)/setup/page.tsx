@@ -68,7 +68,7 @@ export default function SetupPage() {
       <div className="w-full max-w-md px-4 space-y-6">
         <div className="text-center space-y-1">
           <h1 className="text-3xl font-bold tracking-tight">narratorlog</h1>
-          <p className="text-muted-foreground text-sm">Let's get you set up.</p>
+          <p className="text-muted-foreground text-sm">Let&apos;s get you set up.</p>
         </div>
 
         {/* Step indicators */}
@@ -139,7 +139,7 @@ export default function SetupPage() {
             <CardHeader>
               <CardTitle>Create your admin account</CardTitle>
               <CardDescription>
-                This is the account you'll use to sign in.
+                This is the account you&apos;ll use to sign in.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
