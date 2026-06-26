@@ -1,15 +1,14 @@
 {
-  "name": "@narratorlog/plugin-output-slack",
+  "name": "@narratorlog/plugin-output-discord",
   "version": "0.1.0",
-  "description": "Slack output plugin for narratorlog",
+  "description": "Discord output plugin for narratorlog",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "@narratorlog/sdk": "workspace:*",
-    "@slack/web-api": "^7.0.0"
+    "@narratorlog/sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
