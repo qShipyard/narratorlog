@@ -451,11 +451,12 @@ type Session struct {
 }
 
 type Team struct {
-	ID        uuid.UUID          `json:"id"`
-	Name      string             `json:"name"`
-	Slug      string             `json:"slug"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	ID            uuid.UUID          `json:"id"`
+	Name          string             `json:"name"`
+	Slug          string             `json:"slug"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	SetupComplete bool               `json:"setup_complete"`
 }
 
 type User struct {
@@ -469,4 +470,5 @@ type User struct {
 	ProviderID string             `json:"provider_id"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	Password   pgtype.Text        `json:"password"`
 }

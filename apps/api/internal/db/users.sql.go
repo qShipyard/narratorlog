@@ -15,7 +15,7 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (team_id, email, name, avatar_url, role, provider, provider_id)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, team_id, email, name, avatar_url, role, provider, provider_id, created_at, updated_at
+RETURNING id, team_id, email, name, avatar_url, role, provider, provider_id, created_at, updated_at, password
 `
 
 type CreateUserParams struct {
@@ -50,6 +50,50 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.ProviderID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Password,
+	)
+	return i, err
+}
+
+const createUserWithPassword = `-- name: CreateUserWithPassword :one
+INSERT INTO users (team_id, email, name, role, provider, provider_id, password)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, team_id, email, name, avatar_url, role, provider, provider_id, created_at, updated_at, password
+`
+
+type CreateUserWithPasswordParams struct {
+	TeamID     uuid.UUID   `json:"team_id"`
+	Email      string      `json:"email"`
+	Name       string      `json:"name"`
+	Role       UserRole    `json:"role"`
+	Provider   string      `json:"provider"`
+	ProviderID string      `json:"provider_id"`
+	Password   pgtype.Text `json:"password"`
+}
+
+func (q *Queries) CreateUserWithPassword(ctx context.Context, arg CreateUserWithPasswordParams) (User, error) {
+	row := q.db.QueryRow(ctx, createUserWithPassword,
+		arg.TeamID,
+		arg.Email,
+		arg.Name,
+		arg.Role,
+		arg.Provider,
+		arg.ProviderID,
+		arg.Password,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.TeamID,
+		&i.Email,
+		&i.Name,
+		&i.AvatarUrl,
+		&i.Role,
+		&i.Provider,
+		&i.ProviderID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Password,
 	)
 	return i, err
 }
@@ -64,7 +108,7 @@ func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) error {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, team_id, email, name, avatar_url, role, provider, provider_id, created_at, updated_at FROM users
+SELECT id, team_id, email, name, avatar_url, role, provider, provider_id, created_at, updated_at, password FROM users
 WHERE email = $1
 `
 
@@ -82,12 +126,36 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.ProviderID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Password,
+	)
+	return i, err
+}
+
+const getUserByEmailWithPassword = `-- name: GetUserByEmailWithPassword :one
+SELECT id, team_id, email, name, avatar_url, role, provider, provider_id, created_at, updated_at, password FROM users WHERE email = $1
+`
+
+func (q *Queries) GetUserByEmailWithPassword(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByEmailWithPassword, email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.TeamID,
+		&i.Email,
+		&i.Name,
+		&i.AvatarUrl,
+		&i.Role,
+		&i.Provider,
+		&i.ProviderID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Password,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, team_id, email, name, avatar_url, role, provider, provider_id, created_at, updated_at FROM users
+SELECT id, team_id, email, name, avatar_url, role, provider, provider_id, created_at, updated_at, password FROM users
 WHERE id = $1
 `
 
@@ -105,12 +173,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.ProviderID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Password,
 	)
 	return i, err
 }
 
 const getUserByProvider = `-- name: GetUserByProvider :one
-SELECT id, team_id, email, name, avatar_url, role, provider, provider_id, created_at, updated_at FROM users
+SELECT id, team_id, email, name, avatar_url, role, provider, provider_id, created_at, updated_at, password FROM users
 WHERE provider = $1 AND provider_id = $2
 `
 
@@ -133,12 +202,13 @@ func (q *Queries) GetUserByProvider(ctx context.Context, arg GetUserByProviderPa
 		&i.ProviderID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Password,
 	)
 	return i, err
 }
 
 const listUsersByTeam = `-- name: ListUsersByTeam :many
-SELECT id, team_id, email, name, avatar_url, role, provider, provider_id, created_at, updated_at FROM users
+SELECT id, team_id, email, name, avatar_url, role, provider, provider_id, created_at, updated_at, password FROM users
 WHERE team_id = $1
 ORDER BY created_at ASC
 `
@@ -163,6 +233,7 @@ func (q *Queries) ListUsersByTeam(ctx context.Context, teamID uuid.UUID) ([]User
 			&i.ProviderID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Password,
 		); err != nil {
 			return nil, err
 		}
@@ -178,7 +249,7 @@ const updateUserRole = `-- name: UpdateUserRole :one
 UPDATE users
 SET role = $1, updated_at = now()
 WHERE id = $2
-RETURNING id, team_id, email, name, avatar_url, role, provider, provider_id, created_at, updated_at
+RETURNING id, team_id, email, name, avatar_url, role, provider, provider_id, created_at, updated_at, password
 `
 
 type UpdateUserRoleParams struct {
@@ -200,6 +271,7 @@ func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) 
 		&i.ProviderID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Password,
 	)
 	return i, err
 }
@@ -212,7 +284,7 @@ SET
   name       = EXCLUDED.name,
   avatar_url = EXCLUDED.avatar_url,
   updated_at = now()
-RETURNING id, team_id, email, name, avatar_url, role, provider, provider_id, created_at, updated_at
+RETURNING id, team_id, email, name, avatar_url, role, provider, provider_id, created_at, updated_at, password
 `
 
 type UpsertUserParams struct {
@@ -247,6 +319,7 @@ func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, e
 		&i.ProviderID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Password,
 	)
 	return i, err
 }

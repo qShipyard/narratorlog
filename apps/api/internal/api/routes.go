@@ -11,6 +11,10 @@ func RegisterRoutes(r *gin.Engine, h *handlers.Handler, sessions *auth.SessionMa
 	// Health
 	r.GET("/health", h.Health)
 
+	// Setup — first-time configuration
+	r.GET("/setup/status", h.IsSetupComplete)
+	r.POST("/setup", h.Setup)
+
 	// OAuth
 	r.GET("/auth/github", h.GitHubOAuthRedirect)
 	r.GET("/auth/github/callback", h.GitHubOAuthCallback)
