@@ -148,54 +148,6 @@ importers:
         specifier: ^5.4.0
         version: 5.9.3
 
-  plugins/outputs/discord:
-    dependencies:
-      '@narratorlog/sdk':
-        specifier: workspace:*
-        version: link:../../../packages/sdk
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.43
-      typescript:
-        specifier: ^5.4.0
-        version: 5.9.3
-
-  plugins/outputs/email:
-    dependencies:
-      '@narratorlog/sdk':
-        specifier: workspace:*
-        version: link:../../../packages/sdk
-      nodemailer:
-        specifier: ^6.9.0
-        version: 6.10.1
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.43
-      '@types/nodemailer':
-        specifier: ^6.4.0
-        version: 6.4.24
-      typescript:
-        specifier: ^5.4.0
-        version: 5.9.3
-
-  plugins/outputs/linear:
-    dependencies:
-      '@linear/sdk':
-        specifier: ^39.0.0
-        version: 39.2.1
-      '@narratorlog/sdk':
-        specifier: workspace:*
-        version: link:../../../packages/sdk
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.43
-      typescript:
-        specifier: ^5.4.0
-        version: 5.9.3
-
   plugins/outputs/markdown:
     dependencies:
       '@narratorlog/sdk':
