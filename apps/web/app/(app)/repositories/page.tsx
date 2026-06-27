@@ -14,15 +14,15 @@ import { toast } from 'sonner'
 export default function RepositoriesPage() {
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
-  const [showConnectDialog, setShowConnectDialog] = useState(false)
+  const justConnectedGitHub = searchParams.get('connected') === 'github'
+  const [showConnectDialog, setShowConnectDialog] = useState(() => justConnectedGitHub)
 
-  // Check if we just came back from GitHub OAuth
+  // Toasting is a side effect; opening the dialog is handled by initial state above.
   useEffect(() => {
-    if (searchParams.get('connected') === 'github') {
-      setShowConnectDialog(true)
+    if (justConnectedGitHub) {
       toast.success('GitHub connected. Select a repository to add.')
     }
-  }, [searchParams])
+  }, [justConnectedGitHub])
 
   const { data: reposData, isLoading } = useQuery({
     queryKey: ['repos'],

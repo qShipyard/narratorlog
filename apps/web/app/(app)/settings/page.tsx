@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { teamApi, TeamConfigUpdate, RoutingEntry } from '@/lib/api'
@@ -30,15 +30,16 @@ export default function SettingsPage() {
 
   const [form, setForm] = useState<TeamConfigUpdate | null>(null)
 
-  useEffect(() => {
-    if (!data) return
+  const [syncedFrom, setSyncedFrom] = useState<typeof data>(undefined)
+  if (data && data !== syncedFrom) {
+    setSyncedFrom(data)
     setForm({
       ai: { ...data.ai, api_key: '' },
       privacy: data.privacy,
       integrations: {},
       routing: data.routing ?? [],
     })
-  }, [data])
+  }
 
   const save = useMutation({
     mutationFn: (payload: TeamConfigUpdate) => teamApi.updateConfig(payload),
