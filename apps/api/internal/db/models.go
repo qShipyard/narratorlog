@@ -457,6 +457,7 @@ type Team struct {
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 	SetupComplete bool               `json:"setup_complete"`
+	Config        []byte             `json:"config"`
 }
 
 type User struct {

@@ -9,20 +9,24 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/narratorlog/narratorlog/internal/auth"
 	db "github.com/narratorlog/narratorlog/internal/db"
 	"github.com/narratorlog/narratorlog/internal/pipeline"
 	"github.com/narratorlog/narratorlog/internal/store"
+	"github.com/narratorlog/narratorlog/internal/teamconfig"
 )
 
 type ScanProcessor struct {
 	pool    *pgxpool.Pool
 	queries *db.Queries
+	enc     *auth.Encryptor
 }
 
-func NewScanProcessor(pool *pgxpool.Pool) *ScanProcessor {
+func NewScanProcessor(pool *pgxpool.Pool, enc *auth.Encryptor) *ScanProcessor {
 	return &ScanProcessor{
 		pool:    pool,
 		queries: db.New(pool),
+		enc:     enc,
 	}
 }
 
@@ -44,7 +48,18 @@ func (p *ScanProcessor) ProcessTask(ctx context.Context, t *asynq.Task) error {
 		return fmt.Errorf("invalid scan window: %w", err)
 	}
 
-	cfg := buildScanConfig(repo, scanFrom, scanTo)
+	rawCfg, err := p.queries.GetTeamConfig(ctx, repo.TeamID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch team config: %w", err)
+	}
+	tc, err := teamconfig.Parse(rawCfg)
+	if err != nil {
+		return fmt.Errorf("failed to parse team config: %w", err)
+	}
+	cfg, err := buildScanConfig(repo, scanFrom, scanTo, tc, p.enc)
+	if err != nil {
+		return err
+	}
 	st := store.NewPostgresStore(p.pool)
 
 	runner := &pipeline.Runner{
@@ -100,14 +115,45 @@ func parseLookback(s string) (time.Duration, error) {
 	}
 }
 
-func buildScanConfig(repo db.Repository, scanFrom, scanTo time.Time) pipeline.ScanConfig {
-	return pipeline.ScanConfig{
-		Provider:    string(repo.Provider),
-		Repo:        repo.FullName,
-		Branch:      repo.DefaultBranch,
-		ScanFrom:    scanFrom,
-		ScanTo:      scanTo,
-		AccessToken: repo.AccessToken, // decrypted before this point
-		AIDepth:     pipeline.DepthStandard,
+func defaultAudiences() []pipeline.AudienceConfig {
+	return []pipeline.AudienceConfig{
+		{ID: "developers", Tone: "technical"},
+		{ID: "product", Tone: "plain-english"},
+		{ID: "marketing", Tone: "benefit-focused"},
+		{ID: "public", Tone: "friendly"},
 	}
+}
+
+func buildScanConfig(
+	repo db.Repository,
+	scanFrom, scanTo time.Time,
+	tc *teamconfig.Config,
+	enc *auth.Encryptor,
+) (pipeline.ScanConfig, error) {
+	cfg := pipeline.ScanConfig{
+		Provider:     string(repo.Provider),
+		Repo:         repo.FullName,
+		Branch:       repo.DefaultBranch,
+		ScanFrom:     scanFrom,
+		ScanTo:       scanTo,
+		AccessToken:  repo.AccessToken,
+		Audiences:    defaultAudiences(),
+		AIProvider:   tc.AI.Provider,
+		AIModel:      tc.AI.Model,
+		AIBaseURL:    tc.AI.BaseURL,
+		AIDepth:      pipeline.AIDepth(tc.AI.Depth),
+		ScrubSecrets: tc.Privacy.ScrubSecrets,
+		LocalOnly:    tc.Privacy.LocalOnly,
+	}
+	if cfg.AIDepth == "" {
+		cfg.AIDepth = pipeline.DepthStandard
+	}
+	if tc.AI.APIKeyEncrypted != "" {
+		key, err := enc.Decrypt(tc.AI.APIKeyEncrypted)
+		if err != nil {
+			return pipeline.ScanConfig{}, fmt.Errorf("failed to decrypt AI key: %w", err)
+		}
+		cfg.AIAPIKey = key
+	}
+	return cfg, nil
 }

@@ -1,4 +1,4 @@
-FROM golang:1.22-alpine AS builder
+FROM golang:1.25-alpine AS go-builder
 
 WORKDIR /app
 
@@ -11,25 +11,33 @@ COPY apps/api/ .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o narratorlog-api ./cmd/api
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o narratorlog-worker ./cmd/worker
 
-FROM alpine:3.19
+FROM node:20-alpine AS plugin-builder
 
-RUN apk add --no-cache ca-certificates nodejs npm
+RUN corepack enable
 
 WORKDIR /app
 
-COPY --from=builder /app/narratorlog-api .
-COPY --from=builder /app/narratorlog-worker .
-
-# Copy TypeScript plugins
-COPY plugins/ ./plugins/
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/sdk/ ./packages/sdk/
+COPY plugins/ ./plugins/
 
-# Install plugin dependencies
-RUN cd packages/sdk && npm install && npm run build
-RUN cd plugins/sources/github && npm install && npm run build
-RUN cd plugins/ai-providers/anthropic && npm install && npm run build
-RUN cd plugins/outputs/slack && npm install && npm run build
-RUN cd plugins/outputs/markdown && npm install && npm run build
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter '@narratorlog/sdk' --filter './plugins/**' run build
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates nodejs
+
+WORKDIR /app
+
+COPY --from=go-builder /app/narratorlog-api .
+COPY --from=go-builder /app/narratorlog-worker .
+
+# Built TypeScript plugins, the SDK, and the resolved workspace node_modules
+# (plugins are invoked at runtime via `node plugins/<type>/<name>/dist/index.js`).
+COPY --from=plugin-builder /app/node_modules ./node_modules
+COPY --from=plugin-builder /app/packages ./packages
+COPY --from=plugin-builder /app/plugins ./plugins
 
 EXPOSE 8080
 

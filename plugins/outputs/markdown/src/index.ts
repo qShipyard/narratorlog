@@ -16,7 +16,7 @@ function formatDateRange(from: string, to: string): string {
 
 class MarkdownOutputPlugin implements OutputPlugin {
   async deliver(request: DeliverRequest): Promise<DeliverResponse> {
-    const config = request.config as MarkdownConfig
+    const config = request.config as unknown as MarkdownConfig
     const content = getFinalContent(request)
 
     const dateRange = formatDateRange(request.scan.scan_from, request.scan.scan_to)

@@ -18,6 +18,7 @@ func RegisterRoutes(r *gin.Engine, h *handlers.Handler, sessions *auth.SessionMa
 	// OAuth
 	r.GET("/auth/github", h.GitHubOAuthRedirect)
 	r.GET("/auth/github/callback", h.GitHubOAuthCallback)
+	r.POST("/auth/login", h.Login)
 	r.POST("/auth/logout", h.Logout)
 
 	// Webhooks — no auth, signature validated per handler
@@ -68,5 +69,7 @@ func RegisterRoutes(r *gin.Engine, h *handlers.Handler, sessions *auth.SessionMa
 		api.POST("/team/invite", middleware.RequireRole("admin"), h.InviteMember)
 		api.PATCH("/team/members/:id", middleware.RequireRole("admin"), h.UpdateMemberRole)
 		api.DELETE("/team/members/:id", middleware.RequireRole("admin"), h.RemoveMember)
+		api.GET("/team/config", h.GetTeamConfig)
+		api.PUT("/team/config", middleware.RequireRole("admin"), h.UpdateTeamConfig)
 	}
 }

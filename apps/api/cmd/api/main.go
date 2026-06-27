@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/narratorlog/narratorlog/internal/api"
 	"github.com/narratorlog/narratorlog/internal/api/handlers"
+	"github.com/narratorlog/narratorlog/internal/api/middleware"
 	"github.com/narratorlog/narratorlog/internal/auth"
 	"github.com/narratorlog/narratorlog/internal/config"
 	db "github.com/narratorlog/narratorlog/internal/db"
@@ -61,6 +62,7 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(gin.Logger())
+	r.Use(middleware.CORS(cfg.AppURL))
 
 	api.RegisterRoutes(r, h, sessions)
 
