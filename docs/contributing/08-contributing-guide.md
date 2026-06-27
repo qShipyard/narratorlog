@@ -6,7 +6,7 @@ Welcome. narratorlog is an open-source engineering communication tool built by t
 
 ## Before You Start
 
-Read the problem statement (`product/01-problem-statement.md`) and the product requirements (`product/02-product-requirements.md`). Understanding what narratorlog is trying to solve will make your contributions more focused and valuable.
+Read the problem statement (`docs/01-problem-statement.md`) and the product requirements (`docs/02-product-requirements.md`). Understanding what narratorlog is trying to solve will make your contributions more focused and valuable.
 
 ---
 
@@ -47,7 +47,7 @@ Read the problem statement (`product/01-problem-statement.md`) and the product r
 
 ```bash
 # Required
-go 1.22+
+go 1.25+
 rust 1.78+ (with cargo)
 node 20+
 pnpm 9+
@@ -57,30 +57,37 @@ docker + docker compose
 ### Clone and Install
 
 ```bash
-git clone https://github.com/narratorlog/narratorlog
+git clone https://github.com/qShipyard/narratorlog
 cd narratorlog
 
 # Install JS dependencies
 pnpm install
 
-# Build Rust reader
+# Build Rust reader (only needed for `deep` AI depth)
 cd packages/reader && cargo build && cd ../..
+```
+
+Install the [`migrate`](https://github.com/golang-migrate/migrate) CLI used to apply database migrations:
+
+```bash
+go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 ```
 
 ### Start Development Environment
 
 ```bash
-# Start all services (postgres, redis, reader)
+# Start Postgres + Redis
 docker compose -f deploy/docker-compose.dev.yml up -d
 
 # Run database migrations
-cd apps/api && go run cmd/api/main.go migrate
+export DATABASE_URL="postgresql://narratorlog:narratorlog@localhost:5433/narratorlog?sslmode=disable"
+migrate -path apps/api/internal/db/migrations -database "$DATABASE_URL" up
 
 # Start API server
-go run cmd/api/main.go serve
+cd apps/api && go run ./cmd/api
 
 # Start worker (separate terminal)
-go run cmd/worker/main.go
+cd apps/api && go run ./cmd/worker
 
 # Start web app (separate terminal)
 cd apps/web && pnpm dev
@@ -97,11 +104,13 @@ Copy the example env file and fill in your values:
 cp deploy/.env.example .env
 ```
 
-For local development, you only need:
-- `DATABASE_URL` — already set in docker-compose.dev.yml
-- `REDIS_URL` — already set
-- `APP_SECRET` — any 32-character string
-- `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` — from a GitHub OAuth App you create
+For local development you need these in your environment (the values below match
+`docker-compose.dev.yml`):
+- `DATABASE_URL` — `postgresql://narratorlog:narratorlog@localhost:5433/narratorlog?sslmode=disable`
+- `REDIS_URL` — `redis://localhost:6379`
+- `APP_SECRET` — any 32+ character string
+- `ENCRYPTION_KEY` — any 32+ character string; the API and worker must share the same value
+- `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` — from a GitHub OAuth App you create (only needed for GitHub login/connect)
 
 ---
 

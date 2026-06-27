@@ -75,7 +75,7 @@ func (h *Handler) TriggerScan(c *gin.Context) {
 		TriggeredByUserID: pgtype.UUID{Bytes: userUUID, Valid: true},
 		ScanFrom:          pgtype.Timestamptz{Time: lookbackToTime(req.Lookback), Valid: true},
 		ScanTo:            pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-		ConfigSnapshot:    []byte("{}"),
+		ConfigSnapshot:    h.routingSnapshot(c.Request.Context(), teamID),
 	})
 	if err != nil {
 		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to create scan.")

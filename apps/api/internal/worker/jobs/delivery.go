@@ -9,8 +9,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/narratorlog/narratorlog/internal/auth"
 	db "github.com/narratorlog/narratorlog/internal/db"
 	"github.com/narratorlog/narratorlog/internal/pipeline"
+	"github.com/narratorlog/narratorlog/internal/teamconfig"
 )
 
 type DeliveryProcessor struct {
@@ -18,14 +20,16 @@ type DeliveryProcessor struct {
 	queries  *db.Queries
 	resolver *PluginResolver
 	runner   *pipeline.PluginRunner
+	enc      *auth.Encryptor
 }
 
-func NewDeliveryProcessor(pool *pgxpool.Pool) *DeliveryProcessor {
+func NewDeliveryProcessor(pool *pgxpool.Pool, enc *auth.Encryptor) *DeliveryProcessor {
 	return &DeliveryProcessor{
 		pool:     pool,
 		queries:  db.New(pool),
 		resolver: NewPluginResolver(),
 		runner:   pipeline.NewPluginRunner(),
+		enc:      enc,
 	}
 }
 
@@ -60,6 +64,15 @@ func (p *DeliveryProcessor) ProcessTask(ctx context.Context, t *asynq.Task) erro
 		return fmt.Errorf("failed to fetch repository: %w", err)
 	}
 
+	rawCfg, err := p.queries.GetTeamConfig(ctx, scan.TeamID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch team config: %w", err)
+	}
+	tc, err := teamconfig.Parse(rawCfg)
+	if err != nil {
+		return fmt.Errorf("failed to parse team config: %w", err)
+	}
+
 	var failed []string
 	for _, draft := range drafts {
 		if draft.Status != db.DraftStatusApproved {
@@ -68,18 +81,17 @@ func (p *DeliveryProcessor) ProcessTask(ctx context.Context, t *asynq.Task) erro
 
 		outputs := outputCfg.OutputsForAudience(draft.AudienceID)
 
-		// If no outputs configured for this audience — skip silently
+		// No outputs configured for this audience — leave the draft approved so it
+		// delivers once routing is added, instead of marking it delivered with nothing sent.
 		if len(outputs) == 0 {
-			log.Printf("[delivery] no outputs configured for audience=%s", draft.AudienceID)
-			if err := p.queries.MarkDraftDelivered(ctx, draft.ID); err != nil {
-				log.Printf("[delivery] failed to mark draft delivered draft_id=%s", draft.ID)
-			}
+			log.Printf("[delivery] no outputs configured for audience=%s — leaving draft approved draft_id=%s",
+				draft.AudienceID, draft.ID)
 			continue
 		}
 
 		allSucceeded := true
 		for _, output := range outputs {
-			if err := p.deliverToPlugin(ctx, draft, output, scan, repo); err != nil {
+			if err := p.deliverToPlugin(ctx, draft, output, scan, repo, tc); err != nil {
 				log.Printf("[delivery] failed draft_id=%s plugin=%s err=%v",
 					draft.ID, output.Plugin, err)
 				allSucceeded = false
@@ -110,6 +122,7 @@ func (p *DeliveryProcessor) deliverToPlugin(
 	output OutputConfig,
 	scan db.Scan,
 	repo db.Repository,
+	tc *teamconfig.Config,
 ) error {
 	pluginPath, err := p.resolver.OutputPlugin(output.Plugin)
 	if err != nil {
@@ -147,7 +160,20 @@ func (p *DeliveryProcessor) deliverToPlugin(
 		log.Printf("[delivery] failed to record delivery attempt: %v", err)
 	}
 
-	resp, err := p.runner.CallDeliverPlugin(ctx, pluginPath, req)
+	var extraEnv []string
+	if vars, ok := tc.Integrations[output.Plugin]; ok {
+		decrypted := make(map[string]string, len(vars))
+		for name, ct := range vars {
+			val, derr := p.enc.Decrypt(ct)
+			if derr != nil {
+				return fmt.Errorf("failed to decrypt %s secret: %w", output.Plugin, derr)
+			}
+			decrypted[name] = val
+		}
+		extraEnv = pipeline.BuildPluginEnv(decrypted)
+	}
+
+	resp, err := p.runner.CallDeliverPlugin(ctx, pluginPath, req, extraEnv)
 	if err != nil {
 		if delivery.ID != uuid.Nil {
 			errJSON, _ := json.Marshal(map[string]string{"error": err.Error()})

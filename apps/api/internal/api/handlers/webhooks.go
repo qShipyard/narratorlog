@@ -71,7 +71,7 @@ func (h *Handler) GitHubWebhook(c *gin.Context) {
 			TriggeredBy:    db.ScanTriggerWebhook,
 			ScanFrom:       pgtype.Timestamptz{Time: lookbackToTime("7d"), Valid: true},
 			ScanTo:         pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-			ConfigSnapshot: []byte("{}"),
+			ConfigSnapshot: h.routingSnapshot(c.Request.Context(), repo.TeamID),
 		})
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{"received": true})

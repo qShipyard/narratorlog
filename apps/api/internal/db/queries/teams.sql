@@ -29,3 +29,12 @@ WHERE id = $1;
 
 -- name: IsSetupComplete :one
 SELECT setup_complete FROM teams LIMIT 1;
+
+-- name: GetTeamConfig :one
+SELECT config FROM teams
+WHERE id = $1;
+
+-- name: UpdateTeamConfig :exec
+UPDATE teams
+SET config = $1, updated_at = now()
+WHERE id = $2;

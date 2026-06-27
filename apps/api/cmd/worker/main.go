@@ -9,6 +9,7 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/narratorlog/narratorlog/internal/auth"
 	"github.com/narratorlog/narratorlog/internal/config"
 	"github.com/narratorlog/narratorlog/internal/worker"
 	"github.com/narratorlog/narratorlog/internal/worker/jobs"
@@ -30,6 +31,11 @@ func main() {
 		log.Fatalf("failed to ping database: %v", err)
 	}
 
+	enc, err := auth.NewEncryptor(cfg.EncryptionKey)
+	if err != nil {
+		log.Fatalf("failed to create encryptor: %v", err)
+	}
+
 	redisOpt, err := asynq.ParseRedisURI(cfg.RedisURL)
 	if err != nil {
 		log.Fatalf("failed to parse redis URL: %v", err)
@@ -47,8 +53,8 @@ func main() {
 		}),
 	})
 
-	scanProcessor := jobs.NewScanProcessor(pool)
-	deliveryProcessor := jobs.NewDeliveryProcessor(pool)
+	scanProcessor := jobs.NewScanProcessor(pool, enc)
+	deliveryProcessor := jobs.NewDeliveryProcessor(pool, enc)
 
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(jobs.JobScan, scanProcessor.ProcessTask)

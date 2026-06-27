@@ -1,0 +1,112 @@
+# Zero-config quickstart — run the whole app locally with one command:
+#
+#   docker compose -f deploy/docker-compose.quickstart.yml up --build
+#
+# Then open http://localhost:3000. Everything below has working defaults, so no
+# .env file is required. The secrets here are insecure placeholders for local
+# trials only — never use this file for a real deployment (see docker-compose.yml).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: narratorlog
+      POSTGRES_USER: narratorlog
+      POSTGRES_PASSWORD: narratorlog
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U narratorlog"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    image: migrate/migrate:v4.17.1
+    volumes:
+      - ../apps/api/internal/db/migrations:/migrations:ro
+    command:
+      - "-path"
+      - "/migrations"
+      - "-database"
+      - "postgresql://narratorlog:narratorlog@postgres:5432/narratorlog?sslmode=disable"
+      - "up"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    image: narratorlog-api:local
+    environment:
+      - DATABASE_URL=postgresql://narratorlog:narratorlog@postgres:5432/narratorlog?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - APP_URL=http://localhost:3000
+      - APP_SECRET=quickstart-insecure-app-secret-change-me
+      - ENCRYPTION_KEY=quickstart-insecure-encryption-key-change-me
+      - READER_SOCKET=/tmp/reader.sock
+    ports:
+      - "8080:8080"
+    volumes:
+      - reader_socket:/tmp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      reader:
+        condition: service_started
+
+  worker:
+    image: narratorlog-api:local
+    entrypoint: ["./narratorlog-worker"]
+    environment:
+      - DATABASE_URL=postgresql://narratorlog:narratorlog@postgres:5432/narratorlog?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - APP_URL=http://localhost:3000
+      - APP_SECRET=quickstart-insecure-app-secret-change-me
+      - ENCRYPTION_KEY=quickstart-insecure-encryption-key-change-me
+      - READER_SOCKET=/tmp/reader.sock
+    volumes:
+      - reader_socket:/tmp
+    depends_on:
+      api:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+
+  reader:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.reader
+    environment:
+      - READER_SOCKET=/tmp/reader.sock
+    volumes:
+      - reader_socket:/tmp
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  reader_socket:

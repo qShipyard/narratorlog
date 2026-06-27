@@ -14,7 +14,7 @@ import (
 const createTeam = `-- name: CreateTeam :one
 INSERT INTO teams (name, slug)
 VALUES ($1, $2)
-RETURNING id, name, slug, created_at, updated_at, setup_complete
+RETURNING id, name, slug, created_at, updated_at, setup_complete, config
 `
 
 type CreateTeamParams struct {
@@ -32,6 +32,7 @@ func (q *Queries) CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SetupComplete,
+		&i.Config,
 	)
 	return i, err
 }
@@ -39,7 +40,7 @@ func (q *Queries) CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, e
 const createTeamWithSetup = `-- name: CreateTeamWithSetup :one
 INSERT INTO teams (name, slug, setup_complete)
 VALUES ($1, $2, $3)
-RETURNING id, name, slug, created_at, updated_at, setup_complete
+RETURNING id, name, slug, created_at, updated_at, setup_complete, config
 `
 
 type CreateTeamWithSetupParams struct {
@@ -58,12 +59,13 @@ func (q *Queries) CreateTeamWithSetup(ctx context.Context, arg CreateTeamWithSet
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SetupComplete,
+		&i.Config,
 	)
 	return i, err
 }
 
 const getTeamByID = `-- name: GetTeamByID :one
-SELECT id, name, slug, created_at, updated_at, setup_complete FROM teams
+SELECT id, name, slug, created_at, updated_at, setup_complete, config FROM teams
 WHERE id = $1
 `
 
@@ -77,12 +79,13 @@ func (q *Queries) GetTeamByID(ctx context.Context, id uuid.UUID) (Team, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SetupComplete,
+		&i.Config,
 	)
 	return i, err
 }
 
 const getTeamBySlug = `-- name: GetTeamBySlug :one
-SELECT id, name, slug, created_at, updated_at, setup_complete FROM teams
+SELECT id, name, slug, created_at, updated_at, setup_complete, config FROM teams
 WHERE slug = $1
 `
 
@@ -96,8 +99,21 @@ func (q *Queries) GetTeamBySlug(ctx context.Context, slug string) (Team, error) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SetupComplete,
+		&i.Config,
 	)
 	return i, err
+}
+
+const getTeamConfig = `-- name: GetTeamConfig :one
+SELECT config FROM teams
+WHERE id = $1
+`
+
+func (q *Queries) GetTeamConfig(ctx context.Context, id uuid.UUID) ([]byte, error) {
+	row := q.db.QueryRow(ctx, getTeamConfig, id)
+	var config []byte
+	err := row.Scan(&config)
+	return config, err
 }
 
 const isSetupComplete = `-- name: IsSetupComplete :one
@@ -126,7 +142,7 @@ const updateTeam = `-- name: UpdateTeam :one
 UPDATE teams
 SET name = $1, updated_at = now()
 WHERE id = $2
-RETURNING id, name, slug, created_at, updated_at, setup_complete
+RETURNING id, name, slug, created_at, updated_at, setup_complete, config
 `
 
 type UpdateTeamParams struct {
@@ -144,6 +160,23 @@ func (q *Queries) UpdateTeam(ctx context.Context, arg UpdateTeamParams) (Team, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SetupComplete,
+		&i.Config,
 	)
 	return i, err
+}
+
+const updateTeamConfig = `-- name: UpdateTeamConfig :exec
+UPDATE teams
+SET config = $1, updated_at = now()
+WHERE id = $2
+`
+
+type UpdateTeamConfigParams struct {
+	Config []byte    `json:"config"`
+	ID     uuid.UUID `json:"id"`
+}
+
+func (q *Queries) UpdateTeamConfig(ctx context.Context, arg UpdateTeamConfigParams) error {
+	_, err := q.db.Exec(ctx, updateTeamConfig, arg.Config, arg.ID)
+	return err
 }

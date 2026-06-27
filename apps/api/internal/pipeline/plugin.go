@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"time"
 )
@@ -26,9 +27,22 @@ func NewPluginRunner() *PluginRunner {
 	}
 }
 
+// BuildPluginEnv converts a map of env var names to values into KEY=VALUE strings
+// suitable for appending to a subprocess environment. Returns nil for an empty map.
+func BuildPluginEnv(vars map[string]string) []string {
+	if len(vars) == 0 {
+		return nil
+	}
+	env := make([]string, 0, len(vars))
+	for k, v := range vars {
+		env = append(env, k+"="+v)
+	}
+	return env
+}
+
 // run spawns the plugin at pluginPath, writes request as JSON to stdin,
 // and returns the raw stdout bytes as the response.
-func (p *PluginRunner) run(ctx context.Context, pluginPath string, request any) ([]byte, error) {
+func (p *PluginRunner) run(ctx context.Context, pluginPath string, request any, extraEnv []string) ([]byte, error) {
 	reqBytes, err := json.Marshal(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal plugin request: %w", err)
@@ -38,6 +52,9 @@ func (p *PluginRunner) run(ctx context.Context, pluginPath string, request any) 
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "node", pluginPath)
+	if len(extraEnv) > 0 {
+		cmd.Env = append(os.Environ(), extraEnv...)
+	}
 	cmd.Stdin = bytes.NewReader(reqBytes)
 
 	var stdout bytes.Buffer
@@ -69,7 +86,7 @@ func (p *PluginRunner) CallSourcePlugin(
 	pluginPath string,
 	req SourcePluginRequest,
 ) (*SourcePluginResponse, error) {
-	raw, err := p.run(ctx, pluginPath, req)
+	raw, err := p.run(ctx, pluginPath, req, nil)
 	if err != nil {
 		return nil, fmt.Errorf("source plugin call failed: %w", err)
 	}
@@ -94,7 +111,7 @@ func (p *PluginRunner) CallSummarize(
 	pluginPath string,
 	req SummarizePluginRequest,
 ) (*SummarizePluginResponse, error) {
-	raw, err := p.run(ctx, pluginPath, req)
+	raw, err := p.run(ctx, pluginPath, req, nil)
 	if err != nil {
 		return nil, fmt.Errorf("summarize plugin call failed: %w", err)
 	}
@@ -119,7 +136,7 @@ func (p *PluginRunner) CallGenerate(
 	pluginPath string,
 	req GeneratePluginRequest,
 ) (*GeneratePluginResponse, error) {
-	raw, err := p.run(ctx, pluginPath, req)
+	raw, err := p.run(ctx, pluginPath, req, nil)
 	if err != nil {
 		return nil, fmt.Errorf("generate plugin call failed: %w", err)
 	}
@@ -141,8 +158,9 @@ func (p *PluginRunner) CallDeliverPlugin(
 	ctx context.Context,
 	pluginPath string,
 	req DeliverPluginRequest,
+	extraEnv []string,
 ) (*DeliverPluginResponse, error) {
-	raw, err := p.run(ctx, pluginPath, req)
+	raw, err := p.run(ctx, pluginPath, req, extraEnv)
 	if err != nil {
 		return nil, fmt.Errorf("deliver plugin call failed: %w", err)
 	}

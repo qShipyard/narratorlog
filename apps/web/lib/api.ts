@@ -126,6 +126,38 @@ export interface AvailableRepo {
   already_connected: boolean
 }
 
+export interface RoutingEntry {
+  audience: string
+  plugin: string
+  config: Record<string, unknown>
+}
+
+export interface TeamConfigView {
+  ai: {
+    provider: string
+    model: string
+    base_url: string
+    depth: string
+    api_key_set: boolean
+  }
+  privacy: { scrub_secrets: boolean; local_only: boolean }
+  integrations: Record<string, Record<string, boolean>>
+  routing: RoutingEntry[]
+}
+
+export interface TeamConfigUpdate {
+  ai: {
+    provider: string
+    model: string
+    base_url: string
+    depth: string
+    api_key: string // empty string = keep existing
+  }
+  privacy: { scrub_secrets: boolean; local_only: boolean }
+  integrations: Record<string, Record<string, string>> // empty value = keep existing
+  routing: RoutingEntry[]
+}
+
 // ─── API calls ────────────────────────────────────────────────────────────────
 
 export const setupApi = {
@@ -139,7 +171,7 @@ export const setupApi = {
 }
 
 export const authApi = {
-  me: () => api.get<User>('/auth/me'),
+  me: () => api.get<User>('/api/v1/me'),
   login: (email: string, password: string) =>
     api.post<User>('/auth/login', { email, password }),
   logout: () => api.post('/auth/logout'),
@@ -193,4 +225,7 @@ export const teamApi = {
   invite: (email: string, role: string) => api.post('/api/v1/team/invite', { email, role }),
   updateRole: (id: string, role: string) => api.patch(`/api/v1/team/members/${id}`, { role }),
   remove: (id: string) => api.delete(`/api/v1/team/members/${id}`),
+  getConfig: () => api.get<TeamConfigView>('/api/v1/team/config'),
+  updateConfig: (data: TeamConfigUpdate) =>
+    api.put<TeamConfigView>('/api/v1/team/config', data),
 }

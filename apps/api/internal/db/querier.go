@@ -43,6 +43,7 @@ type Querier interface {
 	GetSessionByTokenHash(ctx context.Context, tokenHash string) (GetSessionByTokenHashRow, error)
 	GetTeamByID(ctx context.Context, id uuid.UUID) (Team, error)
 	GetTeamBySlug(ctx context.Context, slug string) (Team, error)
+	GetTeamConfig(ctx context.Context, id uuid.UUID) ([]byte, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByEmailWithPassword(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
@@ -76,6 +77,7 @@ type Querier interface {
 	UpdateScanStatus(ctx context.Context, arg UpdateScanStatusParams) error
 	UpdateScanStatusWithError(ctx context.Context, arg UpdateScanStatusWithErrorParams) error
 	UpdateTeam(ctx context.Context, arg UpdateTeamParams) (Team, error)
+	UpdateTeamConfig(ctx context.Context, arg UpdateTeamConfigParams) error
 	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (User, error)
 	UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error)
 }
