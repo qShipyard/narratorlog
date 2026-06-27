@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/.next
+**/target
+.git
+.turbo
+.pnpm-store
+**/*.log
+.superpowers
+.env

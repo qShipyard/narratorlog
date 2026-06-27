@@ -1,0 +1,17 @@
+{
+  "name": "@narratorlog/plugin-output-discord",
+  "version": "0.1.0",
+  "description": "Discord output plugin for narratorlog",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@narratorlog/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  }
+}

@@ -1,0 +1,45 @@
+FROM golang:1.25-alpine AS go-builder
+
+WORKDIR /app
+
+RUN apk add --no-cache git
+
+COPY apps/api/go.mod apps/api/go.sum ./
+RUN go mod download
+
+COPY apps/api/ .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o narratorlog-api ./cmd/api
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o narratorlog-worker ./cmd/worker
+
+FROM node:20-alpine AS plugin-builder
+
+RUN corepack enable
+
+WORKDIR /app
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/sdk/ ./packages/sdk/
+COPY plugins/ ./plugins/
+
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter '@narratorlog/sdk' --filter './plugins/**' run build
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates nodejs
+
+WORKDIR /app
+
+COPY --from=go-builder /app/narratorlog-api .
+COPY --from=go-builder /app/narratorlog-worker .
+
+# Built TypeScript plugins, the SDK, and the resolved workspace node_modules
+# (plugins are invoked at runtime via `node plugins/<type>/<name>/dist/index.js`).
+COPY --from=plugin-builder /app/node_modules ./node_modules
+COPY --from=plugin-builder /app/packages ./packages
+COPY --from=plugin-builder /app/plugins ./plugins
+
+EXPOSE 8080
+
+ENTRYPOINT ["./narratorlog-api"]
+CMD []

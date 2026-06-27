@@ -1,0 +1,1 @@
+ALTER TABLE teams ADD COLUMN setup_complete BOOLEAN NOT NULL DEFAULT false;

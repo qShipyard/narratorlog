@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   nginx:
     image: nginx:alpine
@@ -8,19 +6,23 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
     depends_on:
       - web
       - api
+    restart: unless-stopped
 
   web:
-    image: ghcr.io/narratorlog/web:latest
+    image: ghcr.io/qshipyard/narratorlog-web:latest
     environment:
-      - NEXT_PUBLIC_API_URL=http://api:8080
+      - NEXT_PUBLIC_API_URL=${APP_URL}
     depends_on:
       - api
+    restart: unless-stopped
 
   api:
-    image: ghcr.io/narratorlog/api:latest
+    image: ghcr.io/qshipyard/narratorlog-api:latest
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
@@ -32,35 +34,58 @@ services:
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
       - GITLAB_CLIENT_ID=${GITLAB_CLIENT_ID}
       - GITLAB_CLIENT_SECRET=${GITLAB_CLIENT_SECRET}
+      - BITBUCKET_CLIENT_ID=${BITBUCKET_CLIENT_ID}
+      - BITBUCKET_CLIENT_SECRET=${BITBUCKET_CLIENT_SECRET}
     volumes:
       - reader_socket:/tmp
     depends_on:
-      - postgres
-      - redis
-      - reader
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      reader:
+        condition: service_started
+    restart: unless-stopped
 
   worker:
-    image: ghcr.io/narratorlog/api:latest
-    command: ["worker"]
+    image: ghcr.io/qshipyard/narratorlog-api:latest
+    entrypoint: ["./narratorlog-worker"]
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
+      - APP_URL=${APP_URL}
       - APP_SECRET=${APP_SECRET}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - READER_SOCKET=/tmp/reader.sock
     volumes:
       - reader_socket:/tmp
     depends_on:
-      - postgres
-      - redis
-      - reader
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      reader:
+        condition: service_started
+    restart: unless-stopped
+
+  migrate:
+    image: migrate/migrate:v4.17.1
+    profiles: ["tools"]
+    volumes:
+      - ../apps/api/internal/db/migrations:/migrations:ro
+    command: ["-path", "/migrations", "-database", "${DATABASE_URL}", "up"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   reader:
-    image: ghcr.io/narratorlog/reader:latest
+    image: ghcr.io/qshipyard/narratorlog-reader:latest
     environment:
       - READER_SOCKET=/tmp/reader.sock
     volumes:
       - reader_socket:/tmp
+    restart: unless-stopped
 
   postgres:
     image: postgres:16-alpine
@@ -75,9 +100,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
+    command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
     healthcheck:
@@ -85,6 +112,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
 volumes:
   postgres_data:

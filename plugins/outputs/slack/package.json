@@ -8,9 +8,11 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "@narratorlog/sdk": "workspace:*"
+    "@narratorlog/sdk": "workspace:*",
+    "@slack/web-api": "^7.0.0"
   },
   "devDependencies": {
+    "@types/node": "^20.0.0",
     "typescript": "^5.4.0"
   }
 }

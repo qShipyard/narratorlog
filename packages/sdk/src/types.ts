@@ -48,6 +48,23 @@ export interface CommitGroupContext {
   codebase_context?: string
 }
 
+export interface SummarizeGroupInput {
+  label: string
+  group_type: GroupType
+  pr_title?: string
+  pr_description?: string
+  issue_titles: string[]
+  changed_files: string[]
+  diff?: string
+  codebase_context?: string
+}
+
+export interface AudienceInput {
+  id: AudienceId
+  tone: string
+  description?: string
+}
+
 export interface SummarizeRequest {
   action: 'summarize'
   group: CommitGroupContext

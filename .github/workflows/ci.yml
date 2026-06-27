@@ -7,14 +7,39 @@ on:
     branches: [main, dev]
 
 jobs:
+  # Detect which language trees changed so each job runs only when relevant.
+  # Skipped jobs report success, so they never block an unrelated PR.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.filter.outputs.go }}
+      rust: ${{ steps.filter.outputs.rust }}
+      typescript: ${{ steps.filter.outputs.typescript }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            go:
+              - 'apps/api/**'
+            rust:
+              - 'packages/reader/**'
+            typescript:
+              - 'apps/web/**'
+              - 'packages/sdk/**'
+              - 'plugins/**'
+
   go:
     name: Go
+    needs: changes
+    if: ${{ needs.changes.outputs.go == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.25'
       - name: Test
         run: cd apps/api && go test ./...
       - name: Vet
@@ -22,6 +47,8 @@ jobs:
 
   rust:
     name: Rust
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,12 +60,12 @@ jobs:
 
   typescript:
     name: TypeScript
+    needs: changes
+    if: ${{ needs.changes.outputs.typescript == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: '20'

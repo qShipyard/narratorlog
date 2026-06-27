@@ -11,6 +11,7 @@
     "@narratorlog/sdk": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "^20.0.0",
     "typescript": "^5.4.0"
   }
 }
