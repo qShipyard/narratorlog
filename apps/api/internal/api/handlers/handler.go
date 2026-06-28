@@ -11,13 +11,11 @@ import (
 )
 
 type Handler struct {
-	queries    *db.Queries
-	sessions   *auth.SessionManager
-	encryptor  *auth.Encryptor
-	cfg        *config.Config
-	asynq      *asynq.Client
-	github     *auth.GitHubOAuthClient
-	stateStore *auth.InMemoryStateStore
+	queries   *db.Queries
+	sessions  *auth.SessionManager
+	encryptor *auth.Encryptor
+	cfg       *config.Config
+	asynq     *asynq.Client
 }
 
 func NewHandler(
@@ -27,23 +25,12 @@ func NewHandler(
 	cfg *config.Config,
 	asynqClient *asynq.Client,
 ) *Handler {
-	var githubClient *auth.GitHubOAuthClient
-	if cfg.GitHub.ClientID != "" {
-		githubClient = auth.NewGitHubOAuthClient(
-			cfg.GitHub.ClientID,
-			cfg.GitHub.ClientSecret,
-			cfg.AppURL+"/auth/github/callback",
-		)
-	}
-
 	return &Handler{
-		queries:    queries,
-		sessions:   sessions,
-		encryptor:  encryptor,
-		cfg:        cfg,
-		asynq:      asynqClient,
-		github:     githubClient,
-		stateStore: auth.NewInMemoryStateStore(),
+		queries:   queries,
+		sessions:  sessions,
+		encryptor: encryptor,
+		cfg:       cfg,
+		asynq:     asynqClient,
 	}
 }
 

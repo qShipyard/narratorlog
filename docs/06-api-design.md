@@ -12,17 +12,17 @@ All requests and responses use JSON. All timestamps are ISO 8601 UTC. All IDs ar
 
 Session-based auth using HTTP-only secure cookies.
 
-OAuth flow:
+Auth flow (email/password — no OAuth):
 ```
-GET  /auth/github              → redirect to GitHub OAuth
-GET  /auth/github/callback     → exchange code, set session cookie, redirect to /dashboard
-GET  /auth/gitlab              → redirect to GitLab OAuth
-GET  /auth/gitlab/callback
-GET  /auth/bitbucket           → redirect to Bitbucket OAuth
-GET  /auth/bitbucket/callback
+POST /auth/login               → verify credentials, set session cookie
 POST /auth/logout              → clear session cookie
-GET  /auth/me                  → current user
+GET  /api/v1/me                → current user
 ```
+
+Git providers are connected separately, not via auth: an admin saves a Personal
+Access Token per provider under Settings → Sources (`PUT /api/v1/team/config`,
+encrypted into the team config). See `GET /api/v1/sources` and
+`GET /api/v1/repos/available?provider=<github|gitlab|bitbucket>`.
 
 All `/api/v1/*` routes require a valid session cookie. Unauthenticated requests return `401`.
 

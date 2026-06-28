@@ -18,20 +18,21 @@ This is a living document. Updated as the project evolves.
 
 ## v0.2 — Web App (Current)
 - [x] Next.js web app — auth, dashboard, scan review, approval
-- [x] Email/password + GitHub OAuth login, first-run setup wizard
+- [x] Email/password login, first-run setup wizard
+- [x] Git source connections via Personal Access Token — GitHub, GitLab, Bitbucket (no OAuth app)
 - [x] Team settings — AI provider, delivery channels, privacy (teams.config)
 - [x] OpenAI AI provider plugin
 - [x] Ollama AI provider plugin (local/private)
 - [x] Notion output plugin
 - [x] Docker Compose self-host setup
-- [ ] GitLab source plugin
+- [x] GitLab source plugin
 - [ ] Real-time scan progress via WebSocket
 
 ## v0.3 — Community
 - [x] Discord, Linear, email output plugins
 - [x] Contribution docs and plugin guide
 - [ ] Plugin scaffolding CLI (create-plugin command)
-- [ ] Bitbucket source plugin
+- [x] Bitbucket source plugin
 - [ ] Groq AI provider plugin
 - [ ] Rust reader — Python, Rust, Ruby support
 - [ ] GitHub Action marketplace listing

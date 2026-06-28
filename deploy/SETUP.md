@@ -9,7 +9,6 @@
 
 - Docker and Docker Compose
 - A domain name pointed at your server
-- GitHub OAuth App credentials
 
 ## 1. Clone the repo
 
@@ -30,14 +29,10 @@ Edit `.env` and fill in every value. Generate secrets with:
 openssl rand -hex 32   # use twice — once for APP_SECRET, once for ENCRYPTION_KEY
 ```
 
-## 3. Create a GitHub OAuth App
+## 3. Connect a git provider
 
-Go to: https://github.com/settings/developers → New OAuth App
-
-- Homepage URL: `https://your-domain.com`
-- Callback URL: `https://your-domain.com/auth/github/callback`
-
-Copy the Client ID and Client Secret into `.env`.
+After logging in, go to **Settings → Sources** and paste a Personal Access Token for
+your git provider (GitHub, GitLab, or Bitbucket). No OAuth app registration required.
 
 ## 4. Run migrations
 

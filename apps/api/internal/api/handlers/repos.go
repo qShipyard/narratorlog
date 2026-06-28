@@ -11,6 +11,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	db "github.com/narratorlog/narratorlog/internal/db"
+	"github.com/narratorlog/narratorlog/internal/sources"
+	"github.com/narratorlog/narratorlog/internal/teamconfig"
 )
 
 func (h *Handler) ListRepos(c *gin.Context) {
@@ -63,7 +65,6 @@ func (h *Handler) ConnectRepo(c *gin.Context) {
 		FullName      string `json:"full_name"     binding:"required"`
 		URL           string `json:"url"           binding:"required"`
 		DefaultBranch string `json:"default_branch"`
-		AccessToken   string `json:"access_token"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -75,29 +76,25 @@ func (h *Handler) ConnectRepo(c *gin.Context) {
 		req.DefaultBranch = "main"
 	}
 
-	// If access_token not in body, try the gh_token cookie (set after GitHub OAuth)
-	if req.AccessToken == "" && req.Provider == "github" {
-		encryptedToken, err := c.Cookie("gh_token")
-		if err != nil {
-			errorResponse(c, http.StatusBadRequest, "NO_ACCESS_TOKEN", "Access token required.")
-			return
-		}
-		decrypted, err := h.encryptor.Decrypt(encryptedToken)
-		if err != nil {
-			errorResponse(c, http.StatusUnauthorized, "INVALID_TOKEN", "Invalid GitHub token.")
-			return
-		}
-		req.AccessToken = decrypted
-	}
-
-	if req.AccessToken == "" {
-		errorResponse(c, http.StatusBadRequest, "NO_ACCESS_TOKEN", "Access token required.")
+	raw, err := h.queries.GetTeamConfig(c.Request.Context(), teamID)
+	if err != nil {
+		errorResponse(c, http.StatusNotFound, "NOT_FOUND", "Team not found.")
 		return
 	}
 
-	encryptedToken, err := h.encryptor.Encrypt(req.AccessToken)
+	cfg, err := teamconfig.Parse(raw)
 	if err != nil {
-		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to encrypt token.")
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to parse config.")
+		return
+	}
+
+	token, baseURL, ok, err := cfg.DecryptedSource(req.Provider, h.encryptor)
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to decrypt source token.")
+		return
+	}
+	if !ok {
+		errorResponse(c, http.StatusConflict, "SOURCE_NOT_CONNECTED", "No token configured for this provider. Go to Settings → Sources.")
 		return
 	}
 
@@ -117,7 +114,7 @@ func (h *Handler) ConnectRepo(c *gin.Context) {
 		FullName:      req.FullName,
 		Url:           req.URL,
 		DefaultBranch: req.DefaultBranch,
-		AccessToken:   encryptedToken,
+		AccessToken:   "",
 		WebhookSecret: pgtype.Text{String: webhookSecret, Valid: true},
 		Config:        []byte("{}"),
 	})
@@ -126,13 +123,13 @@ func (h *Handler) ConnectRepo(c *gin.Context) {
 		return
 	}
 
-	if h.github != nil && req.Provider == "github" {
+	if client, ok := sources.For(req.Provider); ok {
 		parts := splitFullName(req.FullName)
 		if len(parts) == 2 {
-			webhookURL := fmt.Sprintf("%s/webhooks/github?repo_id=%s", h.cfg.AppURL, req.ProviderID)
-			if err := h.github.RegisterWebhook(
+			webhookURL := fmt.Sprintf("%s/webhooks/%s?repo=%s", h.cfg.AppURL, req.Provider, repo.ID)
+			if err := client.RegisterWebhook(
 				c.Request.Context(),
-				req.AccessToken,
+				token, baseURL,
 				parts[0], parts[1],
 				webhookURL,
 				webhookSecret,
@@ -194,30 +191,48 @@ func (h *Handler) DisconnectRepo(c *gin.Context) {
 }
 
 func (h *Handler) ListAvailableRepos(c *gin.Context) {
-	if h.github == nil {
-		errorResponse(c, http.StatusServiceUnavailable, "GITHUB_NOT_CONFIGURED", "GitHub OAuth is not configured.")
-		return
-	}
-
-	encryptedToken, err := c.Cookie("gh_token")
+	teamID, err := uuid.Parse(c.GetString("team_id"))
 	if err != nil {
-		errorResponse(c, http.StatusUnauthorized, "NO_GITHUB_TOKEN", "GitHub not connected. Visit /auth/github first.")
+		errorResponse(c, http.StatusUnauthorized, "INVALID_SESSION", "Invalid session.")
 		return
 	}
 
-	accessToken, err := h.encryptor.Decrypt(encryptedToken)
+	provider := c.DefaultQuery("provider", "github")
+
+	raw, err := h.queries.GetTeamConfig(c.Request.Context(), teamID)
 	if err != nil {
-		errorResponse(c, http.StatusUnauthorized, "INVALID_TOKEN", "Invalid GitHub token.")
+		errorResponse(c, http.StatusNotFound, "NOT_FOUND", "Team not found.")
 		return
 	}
 
-	repos, err := h.github.ListRepos(c.Request.Context(), accessToken)
+	cfg, err := teamconfig.Parse(raw)
 	if err != nil {
-		errorResponse(c, http.StatusInternalServerError, "GITHUB_ERROR", "Failed to fetch repositories from GitHub.")
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to parse config.")
 		return
 	}
 
-	teamID, _ := uuid.Parse(c.GetString("team_id"))
+	token, baseURL, ok, err := cfg.DecryptedSource(provider, h.encryptor)
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to decrypt source token.")
+		return
+	}
+	if !ok {
+		errorResponse(c, http.StatusConflict, "SOURCE_NOT_CONNECTED", "No token configured for this provider. Go to Settings → Sources.")
+		return
+	}
+
+	client, ok := sources.For(provider)
+	if !ok {
+		errorResponse(c, http.StatusBadRequest, "UNKNOWN_PROVIDER", "Unknown git provider.")
+		return
+	}
+
+	repos, err := client.ListRepos(c.Request.Context(), token, baseURL)
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SOURCE_ERROR", "Failed to fetch repositories from provider.")
+		return
+	}
+
 	connected, _ := h.queries.ListRepositoriesByTeam(c.Request.Context(), teamID)
 	connectedIDs := make(map[string]bool)
 	for _, r := range connected {
@@ -227,13 +242,13 @@ func (h *Handler) ListAvailableRepos(c *gin.Context) {
 	data := make([]gin.H, len(repos))
 	for i, r := range repos {
 		data[i] = gin.H{
-			"provider_id":       fmt.Sprintf("%d", r.ID),
+			"provider_id":       r.ProviderID,
 			"full_name":         r.FullName,
 			"name":              r.Name,
-			"url":               r.HTMLURL,
+			"url":               r.URL,
 			"default_branch":    r.DefaultBranch,
 			"private":           r.Private,
-			"already_connected": connectedIDs[fmt.Sprintf("%d", r.ID)],
+			"already_connected": connectedIDs[r.ProviderID],
 		}
 	}
 

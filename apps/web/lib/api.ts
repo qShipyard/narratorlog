@@ -143,6 +143,7 @@ export interface TeamConfigView {
   privacy: { scrub_secrets: boolean; local_only: boolean }
   integrations: Record<string, Record<string, boolean>>
   routing: RoutingEntry[]
+  sources: Record<string, { token_set: boolean; base_url: string }>
 }
 
 export interface TeamConfigUpdate {
@@ -156,6 +157,7 @@ export interface TeamConfigUpdate {
   privacy: { scrub_secrets: boolean; local_only: boolean }
   integrations: Record<string, Record<string, string>> // empty value = keep existing
   routing: RoutingEntry[]
+  sources: Record<string, { token: string; base_url: string }>
 }
 
 // ─── API calls ────────────────────────────────────────────────────────────────
@@ -179,14 +181,14 @@ export const authApi = {
 
 export const reposApi = {
   list: () => api.get<{ data: Repository[] }>('/api/v1/repos'),
-  available: () => api.get<{ data: AvailableRepo[] }>('/api/v1/repos/available'),
+  available: (provider: string) =>
+    api.get<{ data: AvailableRepo[] }>('/api/v1/repos/available', { params: { provider } }),
   connect: (data: {
     provider: string
     provider_id: string
     full_name: string
     url: string
     default_branch: string
-    access_token: string
   }) => api.post<Repository>('/api/v1/repos', data),
   get: (id: string) => api.get<Repository>(`/api/v1/repos/${id}`),
   update: (id: string, config: Record<string, unknown>) =>
@@ -228,4 +230,6 @@ export const teamApi = {
   getConfig: () => api.get<TeamConfigView>('/api/v1/team/config'),
   updateConfig: (data: TeamConfigUpdate) =>
     api.put<TeamConfigView>('/api/v1/team/config', data),
+  getSources: () =>
+    api.get<Record<string, { token_set: boolean; base_url: string }>>('/api/v1/sources'),
 }

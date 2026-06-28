@@ -91,56 +91,6 @@ func (h *Handler) GetMe(c *gin.Context) {
 	})
 }
 
-func (h *Handler) GitHubOAuthRedirect(c *gin.Context) {
-	if h.github == nil {
-		errorResponse(c, http.StatusServiceUnavailable, "GITHUB_NOT_CONFIGURED", "GitHub OAuth is not configured.")
-		return
-	}
-
-	state, err := h.stateStore.Generate()
-	if err != nil {
-		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to generate state.")
-		return
-	}
-
-	c.Redirect(http.StatusTemporaryRedirect, h.github.AuthURL(state))
-}
-
-func (h *Handler) GitHubOAuthCallback(c *gin.Context) {
-	if h.github == nil {
-		errorResponse(c, http.StatusServiceUnavailable, "GITHUB_NOT_CONFIGURED", "GitHub OAuth is not configured.")
-		return
-	}
-
-	state := c.Query("state")
-	code := c.Query("code")
-
-	if !h.stateStore.Validate(c.Request.Context(), state) {
-		errorResponse(c, http.StatusBadRequest, "INVALID_STATE", "Invalid or expired OAuth state.")
-		return
-	}
-
-	accessToken, err := h.github.Exchange(c.Request.Context(), code)
-	if err != nil {
-		errorResponse(c, http.StatusBadRequest, "OAUTH_FAILED", "Failed to exchange OAuth code.")
-		return
-	}
-
-	// Encrypt the token before storing in session cookie
-	encryptedToken, err := h.encryptor.Encrypt(accessToken)
-	if err != nil {
-		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to encrypt token.")
-		return
-	}
-
-	// Store encrypted token in a short-lived cookie
-	// Used by ListAvailableRepos to fetch repos from GitHub
-	c.SetCookie("gh_token", encryptedToken, 600, "/", "", true, true)
-
-	// Redirect back to repositories page
-	c.Redirect(http.StatusTemporaryRedirect, "/repositories?connected=github")
-}
-
 func setCookie(c *gin.Context, name, value string, expires time.Time) {
 	maxAge := int(time.Until(expires).Seconds())
 	c.SetCookie(name, value, maxAge, "/", "", true, true)

@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { scansApi, reposApi } from '@/lib/api'
 import { ScanCard } from '@/components/scan-card'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { PageHeader } from '@/components/page-header'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -40,39 +40,34 @@ export default function ScansPage() {
   }
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Scans</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            History of all pipeline runs.
-          </p>
-        </div>
-        <Button onClick={handleTriggerScan}>Run scan</Button>
-      </div>
+    <div className="p-8 space-y-6 max-w-5xl">
+      <PageHeader
+        eyebrow="Pipeline"
+        title="Scans"
+        description="Every pipeline run, newest first."
+        action={<Button onClick={handleTriggerScan}>Run scan</Button>}
+      />
 
-      <div className="flex items-center gap-3">
-        <Select value={repoFilter} onValueChange={setRepoFilter}>
-          <SelectTrigger className="w-64">
-            <SelectValue placeholder="All repositories" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All repositories</SelectItem>
-            {repos.map(r => (
-              <SelectItem key={r.id} value={r.id}>{r.full_name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <Select value={repoFilter} onValueChange={setRepoFilter}>
+        <SelectTrigger className="w-64">
+          <SelectValue placeholder="All repositories" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All repositories</SelectItem>
+          {repos.map(r => (
+            <SelectItem key={r.id} value={r.id}>{r.full_name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
       {scans.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground text-sm">No scans yet.</p>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border bg-card py-14 text-center">
+          <p className="text-muted-foreground text-sm">
+            No scans yet. Trigger one to read back what shipped.
+          </p>
+        </div>
       ) : (
-        <div className="space-y-2">
+        <div className="rail">
           {scans.map(scan => (
             <ScanCard key={scan.id} scan={scan} highlight={scan.status === 'awaiting_approval'} />
           ))}

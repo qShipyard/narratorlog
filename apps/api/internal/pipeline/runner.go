@@ -73,6 +73,7 @@ func (r *Runner) stageScan(ctx context.Context, scanID string) error {
 		ScanTo:      r.Config.ScanTo.UTC().Format(time.RFC3339),
 		AccessToken: r.Config.AccessToken,
 		Depth:       string(r.Config.AIDepth),
+		BaseURL:     r.Config.SourceBaseURL,
 	})
 	if err != nil {
 		return err

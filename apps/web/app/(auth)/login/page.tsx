@@ -28,16 +28,22 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="w-full max-w-sm space-y-8 px-4">
-        <div className="space-y-2 text-center">
-          <h1 className="text-3xl font-bold tracking-tight">narratorlog</h1>
-          <p className="text-muted-foreground text-sm">
-            Sign in to your workspace.
-          </p>
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+      <div className="w-full max-w-sm space-y-8">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="size-2.5 rounded-[2px] bg-signal" />
+            <span className="font-display text-lg font-bold tracking-tight">narratorlog</span>
+          </div>
+          <div>
+            <p className="eyebrow">Sign in</p>
+            <h1 className="font-display text-2xl font-semibold tracking-tight mt-1.5">
+              Read back what shipped.
+            </h1>
+          </div>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-4 rounded-xl border bg-card p-6">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -61,12 +67,12 @@ export default function LoginPage() {
             />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign in'}
+            {loading ? 'Signing in…' : 'Sign in'}
           </Button>
         </form>
 
-        <p className="text-center text-xs text-muted-foreground">
-          Self-hosted. Your data stays on your infrastructure.
+        <p className="text-center font-mono text-[0.7rem] uppercase tracking-[0.12em] text-muted-foreground">
+          Self-hosted · your data stays on your infrastructure
         </p>
       </div>
     </div>

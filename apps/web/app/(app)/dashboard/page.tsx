@@ -3,10 +3,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { scansApi, reposApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { GitBranch, ScanLine, Clock, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 import { ScanCard } from '@/components/scan-card'
+import { PageHeader } from '@/components/page-header'
+import { cn } from '@/lib/utils'
 
 export default function DashboardPage() {
   const { data: scansData } = useQuery({
@@ -25,108 +25,72 @@ export default function DashboardPage() {
   const pendingApprovals = scans.filter(s => s.status === 'awaiting_approval')
   const delivered = scans.filter(s => s.status === 'delivered')
 
+  const stats = [
+    { label: 'Repositories', value: repos.length },
+    { label: 'Total scans', value: scans.length },
+    { label: 'Awaiting review', value: pendingApprovals.length, signal: true },
+    { label: 'Delivered', value: delivered.length },
+  ]
+
   return (
-    <div className="p-8 space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          What your team shipped recently.
-        </p>
-      </div>
+    <div className="p-8 space-y-8 max-w-5xl">
+      <PageHeader
+        eyebrow="Workspace"
+        title="Dashboard"
+        description="What your team shipped, read back as a story."
+      />
 
-      <div className="grid grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Repositories
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <GitBranch className="h-4 w-4 text-muted-foreground" />
-              <span className="text-2xl font-bold">{repos.length}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Scans
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <ScanLine className="h-4 w-4 text-muted-foreground" />
-              <span className="text-2xl font-bold">{scans.length}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Awaiting Approval
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-yellow-500" />
-              <span className="text-2xl font-bold">{pendingApprovals.length}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Delivered
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              <span className="text-2xl font-bold">{delivered.length}</span>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 sm:grid-cols-4 rounded-xl border bg-card overflow-hidden divide-x divide-y sm:divide-y-0 divide-border">
+        {stats.map(s => (
+          <div key={s.label} className="px-5 py-4">
+            <p className="eyebrow">{s.label}</p>
+            <p
+              className={cn(
+                'font-display text-[2rem] leading-none font-semibold mt-3 tabular-nums',
+                s.signal && s.value > 0 && 'text-signal',
+              )}
+            >
+              {s.value}
+            </p>
+          </div>
+        ))}
       </div>
 
       {pendingApprovals.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-base font-semibold">Awaiting Your Approval</h2>
-          <div className="space-y-2">
+        <section className="space-y-3">
+          <p className="eyebrow">Awaiting your approval</p>
+          <div className="rail">
             {pendingApprovals.map(scan => (
               <ScanCard key={scan.id} scan={scan} highlight />
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      <div className="space-y-3">
+      <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Recent Scans</h2>
+          <p className="eyebrow">Recent scans</p>
           <Link href="/scans">
             <Button variant="ghost" size="sm">View all</Button>
           </Link>
         </div>
         {scans.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground text-sm">No scans yet.</p>
-              <Link href="/repositories">
-                <Button className="mt-4" size="sm">Connect a repository</Button>
-              </Link>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border bg-card py-14 text-center">
+            <p className="text-muted-foreground text-sm">
+              No scans yet. Connect a repository to begin the story.
+            </p>
+            <Link href="/repositories">
+              <Button className="mt-4" size="sm">Connect a repository</Button>
+            </Link>
+          </div>
         ) : (
-          <div className="space-y-2">
-            {scans.slice(0, 5).map(scan => (
+          <div className="rail">
+            {scans.slice(0, 6).map(scan => (
               <ScanCard key={scan.id} scan={scan} />
             ))}
           </div>
         )}
-      </div>
+      </section>
     </div>
   )
 }
