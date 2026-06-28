@@ -2,9 +2,8 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { reposApi, teamApi, AvailableRepo } from '@/lib/api'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/page-header'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { GitBranch, ExternalLink, Plus, Lock, Globe, Check } from 'lucide-react'
 import { useState } from 'react'
@@ -22,57 +21,52 @@ export default function RepositoriesPage() {
   const repos = reposData?.data ?? []
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Repositories</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Connect git repositories to scan.
-          </p>
-        </div>
-        <Button onClick={() => setShowConnectDialog(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Connect repository
-        </Button>
-      </div>
+    <div className="p-8 space-y-6 max-w-4xl">
+      <PageHeader
+        eyebrow="Sources"
+        title="Repositories"
+        description="The repositories narratorlog reads and turns into changelogs."
+        action={
+          <Button onClick={() => setShowConnectDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Connect repository
+          </Button>
+        }
+      />
 
       {isLoading ? (
-        <div className="text-muted-foreground text-sm">Loading...</div>
+        <div className="text-muted-foreground text-sm">Loading…</div>
       ) : repos.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center space-y-4">
-            <GitBranch className="h-8 w-8 text-muted-foreground mx-auto" />
-            <p className="text-muted-foreground text-sm">No repositories connected yet.</p>
-            <Button onClick={() => setShowConnectDialog(true)}>
-              Connect your first repository
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border bg-card py-14 text-center space-y-4">
+          <GitBranch className="h-7 w-7 text-muted-foreground mx-auto" />
+          <p className="text-muted-foreground text-sm">No repositories connected yet.</p>
+          <Button onClick={() => setShowConnectDialog(true)}>
+            Connect your first repository
+          </Button>
+        </div>
       ) : (
-        <div className="space-y-2">
+        <div className="rounded-xl border bg-card divide-y divide-border overflow-hidden">
           {repos.map(repo => (
-            <Card key={repo.id}>
-              <CardContent className="py-4 flex items-center gap-4">
-                <GitBranch className="h-4 w-4 text-muted-foreground shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{repo.full_name}</span>
-                    <Badge variant="secondary" className="text-xs capitalize">
-                      {repo.provider}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Branch: {repo.default_branch}
-                    {repo.last_scanned_at && (
-                      ` · Last scanned ${new Date(repo.last_scanned_at).toLocaleDateString()}`
-                    )}
-                  </p>
+            <div key={repo.id} className="group flex items-center gap-4 px-5 py-4">
+              <GitBranch className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2.5">
+                  <span className="font-mono text-[0.8rem] font-bold truncate">{repo.full_name}</span>
+                  <span className="font-mono text-[0.6rem] font-bold uppercase tracking-[0.12em] text-muted-foreground rounded bg-muted px-1.5 py-0.5">
+                    {repo.provider}
+                  </span>
                 </div>
-                <a href={repo.url} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
-                </a>
-              </CardContent>
-            </Card>
+                <p className="text-xs text-muted-foreground mt-1 font-mono">
+                  {repo.default_branch}
+                  {repo.last_scanned_at && (
+                    ` · scanned ${new Date(repo.last_scanned_at).toLocaleDateString()}`
+                  )}
+                </p>
+              </div>
+              <a href={repo.url} target="_blank" rel="noopener noreferrer" className="opacity-50 group-hover:opacity-100 transition-opacity">
+                <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+              </a>
+            </div>
           ))}
         </div>
       )}
@@ -334,8 +328,8 @@ function RepoListStep({
                 : <Globe className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
               }
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{repo.full_name}</p>
-                <p className="text-xs text-muted-foreground">{repo.default_branch}</p>
+                <p className="font-mono text-[0.8rem] font-bold truncate">{repo.full_name}</p>
+                <p className="font-mono text-xs text-muted-foreground">{repo.default_branch}</p>
               </div>
               {repo.already_connected ? (
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
