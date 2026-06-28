@@ -111,6 +111,7 @@ curl https://your-domain.com/health   # {"status":"ok","version":"0.1.0"}
 The first time you open the web app it runs a setup wizard to create your team and admin account.
 After logging in, go to **Settings** to configure your AI provider (Anthropic, OpenAI, or Ollama) and
 API key, your delivery channels, and privacy options — these are required before scans can summarize or deliver.
+To connect a git repository, go to **Settings → Sources** and paste a Personal Access Token for your provider.
 
 ---
 
@@ -129,8 +130,9 @@ narratorlog works with any LLM:
 ## Status
 
 > Working end to end. The Go pipeline, background worker, web app, Docker setup, and team settings are
-> implemented. **Sources:** GitHub (GitLab and Bitbucket coming soon). **AI providers:** Anthropic, OpenAI,
-> and Ollama (Groq coming soon). **Delivery:** Slack, Notion, Discord, Linear, and email.
+> implemented. **Sources:** GitHub, GitLab, and Bitbucket — connect each with a Personal Access Token
+> in Settings (no OAuth app). **AI providers:** Anthropic, OpenAI, and Ollama (Groq coming soon).
+> **Delivery:** Slack, Notion, Discord, Linear, and email.
 
 We are building in public. Follow along, contribute, and help shape what this becomes.
 

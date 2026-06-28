@@ -1,28 +1,18 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { reposApi, AvailableRepo } from '@/lib/api'
+import { reposApi, teamApi, AvailableRepo } from '@/lib/api'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { GitBranch, ExternalLink, Plus, Lock, Globe, Check } from 'lucide-react'
-import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState } from 'react'
 import { toast } from 'sonner'
 
 export default function RepositoriesPage() {
   const queryClient = useQueryClient()
-  const searchParams = useSearchParams()
-  const justConnectedGitHub = searchParams.get('connected') === 'github'
-  const [showConnectDialog, setShowConnectDialog] = useState(() => justConnectedGitHub)
-
-  // Toasting is a side effect; opening the dialog is handled by initial state above.
-  useEffect(() => {
-    if (justConnectedGitHub) {
-      toast.success('GitHub connected. Select a repository to add.')
-    }
-  }, [justConnectedGitHub])
+  const [showConnectDialog, setShowConnectDialog] = useState(false)
 
   const { data: reposData, isLoading } = useQuery({
     queryKey: ['repos'],
@@ -109,11 +99,13 @@ function ConnectRepoDialog({
   onConnected: () => void
 }) {
   const [step, setStep] = useState<'platform' | 'repos'>('platform')
+  const [provider, setProvider] = useState<'github' | 'gitlab' | 'bitbucket'>('github')
   const [searchQuery, setSearchQuery] = useState('')
 
   // Reset on close
   const handleClose = () => {
     setStep('platform')
+    setProvider('github')
     setSearchQuery('')
     onClose()
   }
@@ -127,15 +119,16 @@ function ConnectRepoDialog({
 
         {step === 'platform' && (
           <PlatformStep
-            onGitHub={() => {
-              window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/github`
+            onAlreadyConnected={(p) => {
+              setProvider(p)
+              setStep('repos')
             }}
-            onAlreadyConnected={() => setStep('repos')}
           />
         )}
 
         {step === 'repos' && (
           <RepoListStep
+            provider={provider}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onConnected={onConnected}
@@ -148,71 +141,119 @@ function ConnectRepoDialog({
 }
 
 function PlatformStep({
-  onGitHub,
   onAlreadyConnected,
 }: {
-  onGitHub: () => void
-  onAlreadyConnected: () => void
+  onAlreadyConnected: (provider: 'github' | 'gitlab' | 'bitbucket') => void
 }) {
+  const { data: sources, isLoading } = useQuery({
+    queryKey: ['sources'],
+    queryFn: () => teamApi.getSources().then((r) => r.data),
+  })
+
+  const githubConnected = sources?.github?.token_set === true
+  const gitlabConnected = sources?.gitlab?.token_set === true
+  const bitbucketConnected = sources?.bitbucket?.token_set === true
+
   return (
     <div className="space-y-4 py-2">
       <p className="text-sm text-muted-foreground">
-        Choose a platform to connect. You&apos;ll be redirected to authorize access.
+        Choose a platform to connect.
       </p>
 
       <div className="space-y-2">
-        <button
-          onClick={onGitHub}
-          className="w-full flex items-center gap-3 p-4 rounded-lg border hover:bg-muted transition-colors text-left"
-        >
-          <GitBranch className="h-5 w-5" />
-          <div>
-            <p className="text-sm font-medium">GitHub</p>
-            <p className="text-xs text-muted-foreground">Connect public and private repositories</p>
-          </div>
-        </button>
+        {githubConnected ? (
+          <button
+            onClick={() => onAlreadyConnected('github')}
+            disabled={isLoading}
+            className="w-full flex items-center gap-3 p-4 rounded-lg border hover:bg-muted transition-colors text-left"
+          >
+            <GitBranch className="h-5 w-5" />
+            <div>
+              <p className="text-sm font-medium">GitHub</p>
+              <p className="text-xs text-muted-foreground">Select a repository to connect</p>
+            </div>
+          </button>
+        ) : (
+          <a
+            href="/settings"
+            className="w-full flex items-center gap-3 p-4 rounded-lg border hover:bg-muted transition-colors text-left"
+          >
+            <GitBranch className="h-5 w-5" />
+            <div>
+              <p className="text-sm font-medium">GitHub</p>
+              <p className="text-xs text-muted-foreground">
+                {isLoading ? 'Checking…' : 'Connect in Settings → Sources'}
+              </p>
+            </div>
+          </a>
+        )}
 
-        <button
-          disabled
-          className="w-full flex items-center gap-3 p-4 rounded-lg border opacity-40 cursor-not-allowed text-left"
-        >
-          <GitBranch className="h-5 w-5" />
-          <div>
-            <p className="text-sm font-medium">GitLab</p>
-            <p className="text-xs text-muted-foreground">Coming soon</p>
-          </div>
-        </button>
+        {gitlabConnected ? (
+          <button
+            onClick={() => onAlreadyConnected('gitlab')}
+            disabled={isLoading}
+            className="w-full flex items-center gap-3 p-4 rounded-lg border hover:bg-muted transition-colors text-left"
+          >
+            <GitBranch className="h-5 w-5" />
+            <div>
+              <p className="text-sm font-medium">GitLab</p>
+              <p className="text-xs text-muted-foreground">Select a repository to connect</p>
+            </div>
+          </button>
+        ) : (
+          <a
+            href="/settings"
+            className="w-full flex items-center gap-3 p-4 rounded-lg border hover:bg-muted transition-colors text-left"
+          >
+            <GitBranch className="h-5 w-5" />
+            <div>
+              <p className="text-sm font-medium">GitLab</p>
+              <p className="text-xs text-muted-foreground">
+                {isLoading ? 'Checking…' : 'Connect in Settings → Sources'}
+              </p>
+            </div>
+          </a>
+        )}
 
-        <button
-          disabled
-          className="w-full flex items-center gap-3 p-4 rounded-lg border opacity-40 cursor-not-allowed text-left"
-        >
-          <GitBranch className="h-5 w-5" />
-          <div>
-            <p className="text-sm font-medium">Bitbucket</p>
-            <p className="text-xs text-muted-foreground">Coming soon</p>
-          </div>
-        </button>
-      </div>
-
-      <div className="border-t pt-3">
-        <button
-          onClick={onAlreadyConnected}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Already authorized GitHub? Select a repository →
-        </button>
+        {bitbucketConnected ? (
+          <button
+            onClick={() => onAlreadyConnected('bitbucket')}
+            disabled={isLoading}
+            className="w-full flex items-center gap-3 p-4 rounded-lg border hover:bg-muted transition-colors text-left"
+          >
+            <GitBranch className="h-5 w-5" />
+            <div>
+              <p className="text-sm font-medium">Bitbucket</p>
+              <p className="text-xs text-muted-foreground">Select a repository to connect</p>
+            </div>
+          </button>
+        ) : (
+          <a
+            href="/settings"
+            className="w-full flex items-center gap-3 p-4 rounded-lg border hover:bg-muted transition-colors text-left"
+          >
+            <GitBranch className="h-5 w-5" />
+            <div>
+              <p className="text-sm font-medium">Bitbucket</p>
+              <p className="text-xs text-muted-foreground">
+                {isLoading ? 'Checking…' : 'Connect in Settings → Sources'}
+              </p>
+            </div>
+          </a>
+        )}
       </div>
     </div>
   )
 }
 
 function RepoListStep({
+  provider,
   searchQuery,
   onSearchChange,
   onConnected,
   onBack,
 }: {
+  provider: 'github' | 'gitlab' | 'bitbucket'
   searchQuery: string
   onSearchChange: (q: string) => void
   onConnected: () => void
@@ -221,8 +262,8 @@ function RepoListStep({
   const queryClient = useQueryClient()
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['available-repos'],
-    queryFn: () => reposApi.available().then(r => r.data),
+    queryKey: ['available-repos', provider],
+    queryFn: () => reposApi.available(provider).then(r => r.data),
   })
 
   const repos = data?.data ?? []
@@ -232,18 +273,14 @@ function RepoListStep({
   )
 
   const connectMutation = useMutation({
-    mutationFn: async (repo: AvailableRepo) => {
-      // We need the access token — it's stored in the gh_token cookie
-      // The API reads it directly from the cookie
-      return reposApi.connect({
-        provider: 'github',
+    mutationFn: (repo: AvailableRepo) =>
+      reposApi.connect({
+        provider,
         provider_id: repo.provider_id,
         full_name: repo.full_name,
         url: repo.url,
         default_branch: repo.default_branch,
-        access_token: '', // API reads from cookie
-      })
-    },
+      }),
     onSuccess: (_, repo) => {
       toast.success(`${repo.full_name} connected.`)
       queryClient.invalidateQueries({ queryKey: ['repos'] })
@@ -252,14 +289,16 @@ function RepoListStep({
     onError: () => toast.error('Failed to connect repository.'),
   })
 
+  const providerLabel = provider === 'gitlab' ? 'GitLab' : 'GitHub'
+
   if (error) {
     return (
       <div className="py-8 text-center space-y-3">
         <p className="text-sm text-muted-foreground">
-          GitHub not connected yet.
+          {providerLabel} not connected yet.
         </p>
         <Button variant="outline" size="sm" onClick={onBack}>
-          Connect GitHub
+          Connect {providerLabel}
         </Button>
       </div>
     )

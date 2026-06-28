@@ -1,7 +1,7 @@
 {
-  "name": "@narratorlog/plugin-source-github",
+  "name": "@narratorlog/plugin-source-gitlab",
   "version": "0.1.0",
-  "description": "GitHub source plugin for narratorlog",
+  "description": "GitLab source plugin for narratorlog",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
@@ -13,7 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "@narratorlog/sdk": "workspace:*",
-    "@octokit/rest": "^20.1.2"
+    "@gitbeaker/rest": "^42.3.0"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",

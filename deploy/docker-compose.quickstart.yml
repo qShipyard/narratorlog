@@ -13,6 +13,10 @@ services:
       POSTGRES_DB: narratorlog
       POSTGRES_USER: narratorlog
       POSTGRES_PASSWORD: narratorlog
+    # Published to the host so you can inspect the DB with a GUI (TablePlus etc.)
+    # at localhost:5433. Containers still reach it as postgres:5432 internally.
+    ports:
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

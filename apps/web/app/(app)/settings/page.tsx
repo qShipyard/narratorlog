@@ -33,11 +33,16 @@ export default function SettingsPage() {
   const [syncedFrom, setSyncedFrom] = useState<typeof data>(undefined)
   if (data && data !== syncedFrom) {
     setSyncedFrom(data)
+    const sourceSeed: Record<string, { token: string; base_url: string }> = {}
+    for (const p of ['github', 'gitlab', 'bitbucket']) {
+      sourceSeed[p] = { token: '', base_url: data.sources?.[p]?.base_url ?? '' }
+    }
     setForm({
       ai: { ...data.ai, api_key: '' },
       privacy: data.privacy,
       integrations: {},
       routing: data.routing ?? [],
+      sources: sourceSeed,
     })
   }
 
@@ -85,6 +90,20 @@ export default function SettingsPage() {
 
   function removeRouting(i: number) {
     setForm((f) => (f ? { ...f, routing: f.routing.filter((_, idx) => idx !== i) } : f))
+  }
+
+  function setSourceField(provider: string, field: 'token' | 'base_url', value: string) {
+    setForm((f) =>
+      f
+        ? {
+            ...f,
+            sources: {
+              ...f.sources,
+              [provider]: { ...(f.sources?.[provider] ?? { token: '', base_url: '' }), [field]: value },
+            },
+          }
+        : f,
+    )
   }
 
   return (
@@ -252,6 +271,50 @@ export default function SettingsPage() {
             + Add route
           </button>
         </div>
+      </section>
+
+      <Separator />
+
+      <section className="space-y-4">
+        <h2 className="font-medium">Git sources</h2>
+        <p className="text-muted-foreground text-xs">
+          Personal access tokens — leave blank to keep existing.
+        </p>
+
+        {(['github', 'gitlab', 'bitbucket'] as const).map((p) => (
+          <div key={p} className="space-y-2">
+            <h3 className="text-sm font-medium capitalize">{p}</h3>
+            <div className="space-y-2 pl-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Personal access token</Label>
+                <Input
+                  type="password"
+                  placeholder={
+                    data?.sources?.[p]?.token_set
+                      ? '•••••••• (saved — leave blank to keep)'
+                      : 'Personal access token'
+                  }
+                  value={form.sources?.[p]?.token ?? ''}
+                  onChange={(e) => setSourceField(p, 'token', e.target.value)}
+                />
+              </div>
+              {(p === 'github' || p === 'gitlab') && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Base URL (optional)</Label>
+                  <Input
+                    placeholder={
+                      p === 'github'
+                        ? 'https://github.example.com — GitHub Enterprise'
+                        : 'https://gitlab.example.com — self-hosted GitLab'
+                    }
+                    value={form.sources?.[p]?.base_url ?? ''}
+                    onChange={(e) => setSourceField(p, 'base_url', e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
       </section>
 
       <Separator />

@@ -200,7 +200,6 @@ Key packages:
 - `github.com/google/uuid` — ID generation
 - `github.com/jackc/pgx/v5` — PostgreSQL driver
 - `github.com/hibiken/asynq` — job queue client
-- `golang.org/x/oauth2` — OAuth 2.0
 
 ---
 
@@ -455,16 +454,11 @@ REDIS_URL=redis://redis:6379
 APP_SECRET=<32-byte-random>       # JWT signing key
 APP_URL=https://your-domain.com
 
-# OAuth (configure the platforms you use)
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
-GITLAB_CLIENT_ID=
-GITLAB_CLIENT_SECRET=
-BITBUCKET_CLIENT_ID=
-BITBUCKET_CLIENT_SECRET=
+# Git providers are connected in-app via Personal Access Tokens
+# (Settings → Sources), encrypted into the team config — no OAuth env needed.
 
 # Encryption
-ENCRYPTION_KEY=<32-byte-random>   # for OAuth token encryption
+ENCRYPTION_KEY=<32-byte-random>   # encrypts stored provider tokens, AI keys, delivery secrets
 
 # Reader
 READER_SOCKET=/tmp/narratorlog-reader.sock

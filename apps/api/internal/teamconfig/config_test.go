@@ -101,6 +101,98 @@ func TestViewMasksSecrets(t *testing.T) {
 	}
 }
 
+func TestSourcesApplyUpdateAndView(t *testing.T) {
+	enc := newEnc(t)
+	c, _ := Parse(nil)
+
+	err := c.ApplyUpdate(UpdateRequest{
+		Sources: map[string]SourceUpdate{
+			"github": {Token: "ghp_x", BaseURL: "https://api.github.com"},
+		},
+	}, enc)
+	if err != nil {
+		t.Fatalf("ApplyUpdate with sources: %v", err)
+	}
+	s := c.Sources["github"]
+	if s.TokenEncrypted == "" || s.TokenEncrypted == "ghp_x" {
+		t.Fatalf("expected token encrypted, got %q", s.TokenEncrypted)
+	}
+	got, err := enc.Decrypt(s.TokenEncrypted)
+	if err != nil || got != "ghp_x" {
+		t.Fatalf("decrypt source token: got %q err %v", got, err)
+	}
+	if s.BaseURL != "https://api.github.com" {
+		t.Fatalf("expected BaseURL set, got %q", s.BaseURL)
+	}
+	firstEncrypted := s.TokenEncrypted
+
+	// Second update with empty Token preserves existing ciphertext but updates BaseURL.
+	err = c.ApplyUpdate(UpdateRequest{
+		Sources: map[string]SourceUpdate{
+			"github": {Token: "", BaseURL: "https://github.example.com"},
+		},
+	}, enc)
+	if err != nil {
+		t.Fatalf("ApplyUpdate preserve token: %v", err)
+	}
+	s = c.Sources["github"]
+	if s.TokenEncrypted != firstEncrypted {
+		t.Fatalf("expected token preserved, got %q", s.TokenEncrypted)
+	}
+	if s.BaseURL != "https://github.example.com" {
+		t.Fatalf("expected BaseURL updated, got %q", s.BaseURL)
+	}
+
+	// View masks token to boolean.
+	v := c.View()
+	sv := v.Sources["github"]
+	if !sv.TokenSet {
+		t.Fatal("expected TokenSet true in view")
+	}
+	if sv.BaseURL != "https://github.example.com" {
+		t.Fatalf("expected BaseURL in view, got %q", sv.BaseURL)
+	}
+	blob, _ := json.Marshal(v)
+	for _, leak := range []string{"ghp_x", firstEncrypted} {
+		if contains(string(blob), leak) {
+			t.Fatalf("view leaked source secret: %q", leak)
+		}
+	}
+}
+
+func TestDecryptedSource(t *testing.T) {
+	enc := newEnc(t)
+	c, _ := Parse(nil)
+
+	_ = c.ApplyUpdate(UpdateRequest{
+		Sources: map[string]SourceUpdate{
+			"github": {Token: "ghp_x", BaseURL: "https://api.github.com"},
+		},
+	}, enc)
+
+	token, baseURL, ok, err := c.DecryptedSource("github", enc)
+	if err != nil {
+		t.Fatalf("DecryptedSource: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected ok=true for known provider")
+	}
+	if token != "ghp_x" {
+		t.Fatalf("expected token ghp_x, got %q", token)
+	}
+	if baseURL != "https://api.github.com" {
+		t.Fatalf("expected baseURL https://api.github.com, got %q", baseURL)
+	}
+
+	_, _, ok, err = c.DecryptedSource("unknown", enc)
+	if err != nil {
+		t.Fatalf("DecryptedSource unknown: %v", err)
+	}
+	if ok {
+		t.Fatal("expected ok=false for unknown provider")
+	}
+}
+
 func TestRoutingSnapshot(t *testing.T) {
 	c, _ := Parse(nil)
 	c.Routing = []Output{{Audience: "developers", Plugin: "notion", Config: map[string]interface{}{"database_id": "db1"}}}

@@ -1,7 +1,7 @@
 {
-  "name": "@narratorlog/plugin-source-github",
+  "name": "@narratorlog/plugin-source-bitbucket",
   "version": "0.1.0",
-  "description": "GitHub source plugin for narratorlog",
+  "description": "Bitbucket Cloud source plugin for narratorlog",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
@@ -12,8 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@narratorlog/sdk": "workspace:*",
-    "@octokit/rest": "^20.1.2"
+    "@narratorlog/sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",

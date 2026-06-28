@@ -136,7 +136,6 @@ func buildScanConfig(
 		Branch:       repo.DefaultBranch,
 		ScanFrom:     scanFrom,
 		ScanTo:       scanTo,
-		AccessToken:  repo.AccessToken,
 		Audiences:    defaultAudiences(),
 		AIProvider:   tc.AI.Provider,
 		AIModel:      tc.AI.Model,
@@ -154,6 +153,14 @@ func buildScanConfig(
 			return pipeline.ScanConfig{}, fmt.Errorf("failed to decrypt AI key: %w", err)
 		}
 		cfg.AIAPIKey = key
+	}
+	token, baseURL, ok, err := tc.DecryptedSource(string(repo.Provider), enc)
+	if err != nil {
+		return pipeline.ScanConfig{}, fmt.Errorf("failed to decrypt source token: %w", err)
+	}
+	if ok {
+		cfg.AccessToken = token
+		cfg.SourceBaseURL = baseURL
 	}
 	return cfg, nil
 }

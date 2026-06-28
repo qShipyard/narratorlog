@@ -110,7 +110,7 @@ For local development you need these in your environment (the values below match
 - `REDIS_URL` — `redis://localhost:6379`
 - `APP_SECRET` — any 32+ character string
 - `ENCRYPTION_KEY` — any 32+ character string; the API and worker must share the same value
-- `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` — from a GitHub OAuth App you create (only needed for GitHub login/connect)
+- To connect a git provider (GitHub/GitLab/Bitbucket), no env is needed — paste a Personal Access Token in the app under Settings → Sources (it is encrypted into the team config).
 
 ---
 
