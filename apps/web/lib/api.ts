@@ -47,7 +47,7 @@ export interface Repository {
 
 export interface Scan {
   id: string
-  repository: {
+  repository?: {
     id: string
     full_name: string
   }
@@ -158,6 +158,29 @@ export interface TeamConfigUpdate {
   integrations: Record<string, Record<string, string>> // empty value = keep existing
   routing: RoutingEntry[]
   sources: Record<string, { token: string; base_url: string }>
+}
+
+// Build an update payload that preserves everything in the current config.
+// Empty token / api_key / integration value all mean "keep existing" on the
+// server, so callers only set the one field they intend to change.
+export function configViewToUpdate(v: TeamConfigView): TeamConfigUpdate {
+  const sources: Record<string, { token: string; base_url: string }> = {}
+  for (const p of ['github', 'gitlab', 'bitbucket']) {
+    sources[p] = { token: '', base_url: v.sources?.[p]?.base_url ?? '' }
+  }
+  return {
+    ai: {
+      provider: v.ai.provider,
+      model: v.ai.model,
+      base_url: v.ai.base_url,
+      depth: v.ai.depth,
+      api_key: '',
+    },
+    privacy: v.privacy,
+    integrations: {},
+    routing: v.routing ?? [],
+    sources,
+  }
 }
 
 // ─── API calls ────────────────────────────────────────────────────────────────
