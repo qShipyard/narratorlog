@@ -2,10 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion } from 'motion/react'
 import { authApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { SignalMark } from '@/components/signal-mark'
+import { duration, ease } from '@/lib/motion'
 import { toast } from 'sonner'
 
 export default function LoginPage() {
@@ -29,11 +32,21 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm space-y-8">
+      <motion.div
+        className="w-full max-w-sm space-y-8"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: duration.slow, ease }}
+      >
         <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="size-2.5 rounded-[2px] bg-signal" />
-            <span className="font-display text-lg font-bold tracking-tight">narratorlog</span>
+          <div className="flex items-center gap-2.5">
+            <SignalMark state="live" />
+            <span className="leading-none">
+              <span className="block font-display text-lg font-bold tracking-tight">narratorlog</span>
+              <span className="block font-mono text-[0.5rem] uppercase tracking-[0.2em] text-muted-foreground mt-0.5">
+                by qShipyard
+              </span>
+            </span>
           </div>
           <div>
             <p className="eyebrow">Sign in</p>
@@ -74,7 +87,7 @@ export default function LoginPage() {
         <p className="text-center font-mono text-[0.7rem] uppercase tracking-[0.12em] text-muted-foreground">
           Self-hosted · your data stays on your infrastructure
         </p>
-      </div>
+      </motion.div>
     </div>
   )
 }

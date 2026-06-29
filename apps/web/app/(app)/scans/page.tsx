@@ -1,18 +1,25 @@
 'use client'
 
+import { Suspense } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { scansApi, reposApi } from '@/lib/api'
 import { ScanCard } from '@/components/scan-card'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/page-header'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useState } from 'react'
+import { RevealGroup, RevealItem } from '@/components/reveal'
+import { useScanTrigger } from '@/lib/hooks/use-scan-trigger'
 import { toast } from 'sonner'
 
-export default function ScansPage() {
-  const [repoFilter, setRepoFilter] = useState<string>('all')
+function ScansContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const repoFilter = searchParams.get('repo') ?? 'all'
 
-  const { data: scansData, refetch } = useQuery({
+  const trigger = useScanTrigger()
+
+  const { data: scansData } = useQuery({
     queryKey: ['scans', repoFilter],
     queryFn: () => scansApi.list(repoFilter !== 'all' ? { repo_id: repoFilter } : {}).then(r => r.data),
   })
@@ -25,18 +32,20 @@ export default function ScansPage() {
   const scans = scansData?.data ?? []
   const repos = reposData?.data ?? []
 
-  async function handleTriggerScan() {
+  function setRepoFilter(value: string) {
+    const params = new URLSearchParams(searchParams)
+    if (value === 'all') params.delete('repo')
+    else params.set('repo', value)
+    const query = params.toString()
+    router.replace(query ? `/scans?${query}` : '/scans')
+  }
+
+  function handleTriggerScan() {
     if (repoFilter === 'all') {
-      toast.error('Select a repository to trigger a scan.')
+      toast.error('Select a repository to run a scan.')
       return
     }
-    try {
-      await scansApi.trigger({ repository_id: repoFilter, lookback: '7d' })
-      toast.success('Scan queued.')
-      refetch()
-    } catch {
-      toast.error('Failed to trigger scan.')
-    }
+    trigger.mutate({ repository_id: repoFilter })
   }
 
   return (
@@ -45,7 +54,11 @@ export default function ScansPage() {
         eyebrow="Pipeline"
         title="Scans"
         description="Every pipeline run, newest first."
-        action={<Button onClick={handleTriggerScan}>Run scan</Button>}
+        action={
+          <Button onClick={handleTriggerScan} disabled={trigger.isPending}>
+            {trigger.isPending ? 'Queuing…' : 'Run scan'}
+          </Button>
+        }
       />
 
       <Select value={repoFilter} onValueChange={setRepoFilter}>
@@ -63,16 +76,26 @@ export default function ScansPage() {
       {scans.length === 0 ? (
         <div className="rounded-xl border bg-card py-14 text-center">
           <p className="text-muted-foreground text-sm">
-            No scans yet. Trigger one to read back what shipped.
+            No scans yet. Run one to read back what shipped.
           </p>
         </div>
       ) : (
-        <div className="rail">
+        <RevealGroup className="rail">
           {scans.map(scan => (
-            <ScanCard key={scan.id} scan={scan} highlight={scan.status === 'awaiting_approval'} />
+            <RevealItem key={scan.id}>
+              <ScanCard scan={scan} highlight={scan.status === 'awaiting_approval'} />
+            </RevealItem>
           ))}
-        </div>
+        </RevealGroup>
       )}
     </div>
+  )
+}
+
+export default function ScansPage() {
+  return (
+    <Suspense>
+      <ScansContent />
+    </Suspense>
   )
 }

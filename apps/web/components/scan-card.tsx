@@ -61,7 +61,7 @@ export function ScanCard({ scan, highlight }: { scan: Scan; highlight?: boolean 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2.5">
           <span className="font-mono text-[0.8rem] font-bold truncate text-foreground">
-            {scan.repository.full_name}
+            {scan.repository?.full_name ?? 'Unknown repository'}
           </span>
           <StatusChip status={scan.status} />
         </div>

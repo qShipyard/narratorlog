@@ -2,11 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { AnimatePresence, motion } from 'motion/react'
 import { setupApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { SignalMark } from '@/components/signal-mark'
+import { duration, ease } from '@/lib/motion'
 import { toast } from 'sonner'
 import { CheckCircle } from 'lucide-react'
 
@@ -65,10 +68,25 @@ export default function SetupPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="w-full max-w-md px-4 space-y-6">
-        <div className="text-center space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight">narratorlog</h1>
-          <p className="text-muted-foreground text-sm">Let&apos;s get you set up.</p>
+      <motion.div
+        className="w-full max-w-md px-4 space-y-6"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: duration.slow, ease }}
+      >
+        <div className="flex flex-col items-center text-center space-y-2">
+          <div className="flex items-center gap-2.5">
+            <SignalMark state="live" />
+            <span className="leading-none">
+              <span className="block font-display text-2xl font-bold tracking-tight">narratorlog</span>
+              <span className="block font-mono text-[0.5rem] uppercase tracking-[0.2em] text-muted-foreground mt-0.5">
+                by qShipyard
+              </span>
+            </span>
+          </div>
+          <p className="text-muted-foreground text-sm">
+            Three quick steps, then we&apos;ll walk you to your first story.
+          </p>
         </div>
 
         {/* Step indicators */}
@@ -103,6 +121,14 @@ export default function SetupPage() {
           ))}
         </div>
 
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={step}
+            initial={{ opacity: 0, x: 12 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -12 }}
+            transition={{ duration: duration.base, ease }}
+          >
         {/* Step 1 — Workspace */}
         {step === 'team' && (
           <Card>
@@ -238,7 +264,9 @@ export default function SetupPage() {
             </CardContent>
           </Card>
         )}
-      </div>
+          </motion.div>
+        </AnimatePresence>
+      </motion.div>
     </div>
   )
 }

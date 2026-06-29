@@ -19,22 +19,59 @@ func (h *Handler) ListScans(c *gin.Context) {
 		return
 	}
 
-	scans, err := h.queries.ListScansByTeam(c.Request.Context(), db.ListScansByTeamParams{
-		TeamID: teamID,
-		Limit:  20,
-		Offset: 0,
-	})
-	if err != nil {
-		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to fetch scans.")
-		return
+	var scans []db.Scan
+	if repoParam := c.Query("repo_id"); repoParam != "" {
+		repoID, err := uuid.Parse(repoParam)
+		if err != nil {
+			errorResponse(c, http.StatusBadRequest, "INVALID_ID", "Invalid repository ID.")
+			return
+		}
+		scans, err = h.queries.ListScansByRepository(c.Request.Context(), db.ListScansByRepositoryParams{
+			RepositoryID: repoID,
+			Limit:        20,
+			Offset:       0,
+		})
+		if err != nil {
+			errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to fetch scans.")
+			return
+		}
+	} else {
+		scans, err = h.queries.ListScansByTeam(c.Request.Context(), db.ListScansByTeamParams{
+			TeamID: teamID,
+			Limit:  20,
+			Offset: 0,
+		})
+		if err != nil {
+			errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to fetch scans.")
+			return
+		}
 	}
 
+	getRepo := h.repoLookup(c)
 	data := make([]gin.H, len(scans))
 	for i, s := range scans {
-		data[i] = scanToJSON(s)
+		data[i] = scanToJSON(s, getRepo(s.RepositoryID))
 	}
 
 	c.JSON(http.StatusOK, gin.H{"data": data})
+}
+
+// repoLookup returns a memoized fetcher so a scan list resolves each repository
+// once, regardless of whether it is still active.
+func (h *Handler) repoLookup(c *gin.Context) func(uuid.UUID) *db.Repository {
+	cache := make(map[uuid.UUID]*db.Repository)
+	return func(id uuid.UUID) *db.Repository {
+		if r, ok := cache[id]; ok {
+			return r
+		}
+		r, err := h.queries.GetRepositoryByID(c.Request.Context(), id)
+		if err != nil {
+			cache[id] = nil
+			return nil
+		}
+		cache[id] = &r
+		return &r
+	}
 }
 
 func (h *Handler) TriggerScan(c *gin.Context) {
@@ -116,7 +153,12 @@ func (h *Handler) GetScan(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, scanToJSON(scan))
+	var repo *db.Repository
+	if r, err := h.queries.GetRepositoryByID(c.Request.Context(), scan.RepositoryID); err == nil {
+		repo = &r
+	}
+
+	c.JSON(http.StatusOK, scanToJSON(scan, repo))
 }
 
 func (h *Handler) ListScanCommits(c *gin.Context) {
@@ -245,8 +287,8 @@ func (h *Handler) CancelScan(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func scanToJSON(s db.Scan) gin.H {
-	return gin.H{
+func scanToJSON(s db.Scan, repo *db.Repository) gin.H {
+	h := gin.H{
 		"id":             s.ID,
 		"team_id":        s.TeamID,
 		"repository_id":  s.RepositoryID,
@@ -260,6 +302,13 @@ func scanToJSON(s db.Scan) gin.H {
 		"created_at":     s.CreatedAt,
 		"updated_at":     s.UpdatedAt,
 	}
+	if repo != nil {
+		h["repository"] = gin.H{
+			"id":        repo.ID,
+			"full_name": repo.FullName,
+		}
+	}
+	return h
 }
 
 func lookbackToTime(lookback string) time.Time {

@@ -10,6 +10,7 @@
   --font-sans: var(--font-geist-sans);
   --font-display: var(--font-space-display);
   --font-mono: var(--font-space-mono);
+  --font-serif: var(--font-newsreader);
   --font-heading: var(--font-space-display);
   --color-signal: var(--signal);
   --color-signal-foreground: var(--signal-foreground);
@@ -165,5 +166,39 @@
   }
   .rail-node.is-signal::before {
     @apply bg-signal;
+  }
+
+  /* Investigation theater — the dark register for live scans and review.
+     A near-invisible dot grid gives the ink ground presence without motion. */
+  .theater {
+    background-color: var(--background);
+    background-image: radial-gradient(
+      color-mix(in oklch, var(--foreground) 9%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 22px 22px;
+  }
+
+  /* The amber pulse that travels the active pipeline connector. */
+  .connector-live {
+    background-image: linear-gradient(
+      90deg,
+      var(--rail) 0%,
+      var(--signal) 50%,
+      var(--rail) 100%
+    );
+    background-size: 200% 100%;
+    animation: connector-travel 1.6s linear infinite;
+  }
+  @keyframes connector-travel {
+    from { background-position: 200% 0; }
+    to { background-position: 0% 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .connector-live {
+      animation: none;
+      background: var(--signal);
+    }
   }
 }
