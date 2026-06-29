@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { ScanCard } from '@/components/scan-card'
 import { PageHeader } from '@/components/page-header'
+import { FirstRunChecklist } from '@/components/first-run-checklist'
+import { RevealGroup, RevealItem } from '@/components/reveal'
 import { cn } from '@/lib/utils'
 
 export default function DashboardPage() {
@@ -40,6 +42,8 @@ export default function DashboardPage() {
         description="What your team shipped, read back as a story."
       />
 
+      <FirstRunChecklist repos={repos} scans={scans} />
+
       <div className="grid grid-cols-2 sm:grid-cols-4 rounded-xl border bg-card overflow-hidden divide-x divide-y sm:divide-y-0 divide-border">
         {stats.map(s => (
           <div key={s.label} className="px-5 py-4">
@@ -59,11 +63,13 @@ export default function DashboardPage() {
       {pendingApprovals.length > 0 && (
         <section className="space-y-3">
           <p className="eyebrow">Awaiting your approval</p>
-          <div className="rail">
+          <RevealGroup className="rail">
             {pendingApprovals.map(scan => (
-              <ScanCard key={scan.id} scan={scan} highlight />
+              <RevealItem key={scan.id}>
+                <ScanCard scan={scan} highlight />
+              </RevealItem>
             ))}
-          </div>
+          </RevealGroup>
         </section>
       )}
 
@@ -84,11 +90,13 @@ export default function DashboardPage() {
             </Link>
           </div>
         ) : (
-          <div className="rail">
+          <RevealGroup className="rail">
             {scans.slice(0, 6).map(scan => (
-              <ScanCard key={scan.id} scan={scan} />
+              <RevealItem key={scan.id}>
+                <ScanCard scan={scan} />
+              </RevealItem>
             ))}
-          </div>
+          </RevealGroup>
         )}
       </section>
     </div>

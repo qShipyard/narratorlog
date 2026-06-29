@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { authApi, setupApi } from '@/lib/api'
 import { Sidebar } from '@/components/sidebar'
+import { CommandPalette } from '@/components/command-palette'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
@@ -48,6 +49,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-auto">
         {children}
       </main>
+      <CommandPalette />
     </div>
   )
 }

@@ -3,12 +3,13 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { teamApi, TeamConfigUpdate, RoutingEntry } from '@/lib/api'
+import { teamApi, TeamConfigUpdate, RoutingEntry, configViewToUpdate } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PageHeader } from '@/components/page-header'
+import { KeyField, KeyGuideId } from '@/components/key-field'
 
 const SECTIONS = [
   { id: 'ai', label: 'AI provider' },
@@ -67,17 +68,7 @@ export default function SettingsPage() {
   const [syncedFrom, setSyncedFrom] = useState<typeof data>(undefined)
   if (data && data !== syncedFrom) {
     setSyncedFrom(data)
-    const sourceSeed: Record<string, { token: string; base_url: string }> = {}
-    for (const p of ['github', 'gitlab', 'bitbucket']) {
-      sourceSeed[p] = { token: '', base_url: data.sources?.[p]?.base_url ?? '' }
-    }
-    setForm({
-      ai: { ...data.ai, api_key: '' },
-      privacy: data.privacy,
-      integrations: {},
-      routing: data.routing ?? [],
-      sources: sourceSeed,
-    })
+    setForm(configViewToUpdate(data))
   }
 
   const save = useMutation({
@@ -199,17 +190,26 @@ export default function SettingsPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>API key</Label>
-              <Input
-                type="password"
-                placeholder={
-                  data?.ai.api_key_set ? '•••••••• (saved — leave blank to keep)' : 'API key'
-                }
+            {form.ai.provider === 'anthropic' || form.ai.provider === 'openai' ? (
+              <KeyField
+                guideId={form.ai.provider as KeyGuideId}
                 value={form.ai.api_key}
-                onChange={(e) => setForm({ ...form, ai: { ...form.ai, api_key: e.target.value } })}
+                saved={data?.ai.api_key_set}
+                onChange={(v) => setForm({ ...form, ai: { ...form.ai, api_key: v } })}
               />
-            </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>API key</Label>
+                <Input
+                  type="password"
+                  placeholder={
+                    data?.ai.api_key_set ? '•••••••• (saved — leave blank to keep)' : 'Optional for local models'
+                  }
+                  value={form.ai.api_key}
+                  onChange={(e) => setForm({ ...form, ai: { ...form.ai, api_key: e.target.value } })}
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Base URL</Label>
@@ -243,21 +243,16 @@ export default function SettingsPage() {
             title="Delivery"
             description="Where approved changelogs are published, and who reads each one."
           >
-            <div className="space-y-3">
+            <div className="space-y-4">
               <p className="eyebrow">Credentials</p>
               {OUTPUT_PLUGINS.map((plugin) => (
-                <div key={plugin} className="flex items-center gap-3">
-                  <span className="w-20 shrink-0 font-mono text-xs capitalize">{plugin}</span>
-                  <Input
-                    type="password"
-                    placeholder={
-                      data?.integrations?.[plugin]?.[INTEGRATION_SECRET[plugin]]
-                        ? '•••••••• (saved)'
-                        : INTEGRATION_SECRET[plugin]
-                    }
-                    onChange={(e) => setIntegrationSecret(plugin, e.target.value)}
-                  />
-                </div>
+                <KeyField
+                  key={plugin}
+                  guideId={plugin as KeyGuideId}
+                  value={form.integrations?.[plugin]?.[INTEGRATION_SECRET[plugin]] ?? ''}
+                  saved={Boolean(data?.integrations?.[plugin]?.[INTEGRATION_SECRET[plugin]])}
+                  onChange={(v) => setIntegrationSecret(plugin, v)}
+                />
               ))}
             </div>
 
@@ -352,19 +347,13 @@ export default function SettingsPage() {
                     )}
                   </div>
                   <div className="space-y-3">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Personal access token</Label>
-                      <Input
-                        type="password"
-                        placeholder={
-                          connected
-                            ? '•••••••• (saved — leave blank to keep)'
-                            : 'Personal access token'
-                        }
-                        value={form.sources?.[p]?.token ?? ''}
-                        onChange={(e) => setSourceField(p, 'token', e.target.value)}
-                      />
-                    </div>
+                    <KeyField
+                      guideId={p}
+                      label="Personal access token"
+                      value={form.sources?.[p]?.token ?? ''}
+                      saved={connected}
+                      onChange={(v) => setSourceField(p, 'token', v)}
+                    />
                     {(p === 'github' || p === 'gitlab') && (
                       <div className="space-y-1.5">
                         <Label className="text-xs">Base URL (optional)</Label>
