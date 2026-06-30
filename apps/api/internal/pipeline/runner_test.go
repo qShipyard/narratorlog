@@ -179,7 +179,7 @@ func TestRunner_SourceFailureFailsScan(t *testing.T) {
 	if err := r.Run(context.Background(), "scan-1"); err == nil {
 		t.Fatal("expected scan to fail when source plugin fails")
 	}
-	if store.lastStatus() != ScanStatusFailed {
-		t.Errorf("expected failed status, got %q", store.lastStatus())
+	if store.lastStatus() != ScanStatusRunning {
+		t.Errorf("expected running status (worker marks failed after retries), got %q", store.lastStatus())
 	}
 }

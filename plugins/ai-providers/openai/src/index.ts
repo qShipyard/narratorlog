@@ -72,8 +72,8 @@ function buildSummarizePrompt(group: SummarizeGroupInput): string {
 
   if (group.pr_title) parts.push(`Pull Request: ${group.pr_title}`)
   if (group.pr_description) parts.push(`Description: ${group.pr_description}`)
-  if (group.issue_titles.length > 0) parts.push(`Linked Issues: ${group.issue_titles.join(', ')}`)
-  if (group.changed_files.length > 0) parts.push(`Changed Files: ${group.changed_files.join(', ')}`)
+  if (group.issue_titles?.length) parts.push(`Linked Issues: ${group.issue_titles.join(', ')}`)
+  if (group.changed_files?.length) parts.push(`Changed Files: ${group.changed_files.join(', ')}`)
   if (group.codebase_context) parts.push(`Context:\n${group.codebase_context}`)
   if (group.diff) {
     const diff = group.diff.length > MAX_DIFF_CHARS

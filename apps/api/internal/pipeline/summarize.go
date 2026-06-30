@@ -55,6 +55,19 @@ func Summarize(ctx context.Context, ai AIProvider, in SummarizeInput) (Summarize
 	byID := indexCommits(in.Commits)
 
 	// ── Pass 1 — chunk summaries (parallel) ──
+	var mu sync.Mutex
+	var firstErr error
+	recordErr := func(err error) {
+		if err == nil {
+			return
+		}
+		mu.Lock()
+		if firstErr == nil {
+			firstErr = err
+		}
+		mu.Unlock()
+	}
+
 	var wg sync.WaitGroup
 	for i := range groups {
 		wg.Add(1)
@@ -71,6 +84,7 @@ func Summarize(ctx context.Context, ai AIProvider, in SummarizeInput) (Summarize
 				return ai.Summarize(ctx, req)
 			})
 			if err != nil {
+				recordErr(err)
 				return
 			}
 			s := resp.Summary
@@ -84,6 +98,9 @@ func Summarize(ctx context.Context, ai AIProvider, in SummarizeInput) (Summarize
 	// ── Pass 2 — audience drafts (parallel) ──
 	summaries := collectSummaries(groups)
 	if len(summaries) == 0 {
+		if len(groups) > 0 {
+			return res, FormatAIScanFailure(firstErr)
+		}
 		return res, nil
 	}
 	summaries = capPass2Summaries(summaries)
@@ -113,6 +130,7 @@ func Summarize(ctx context.Context, ai AIProvider, in SummarizeInput) (Summarize
 				return ai.Generate(ctx, req)
 			})
 			if err != nil {
+				recordErr(err)
 				failed[i] = true
 				return
 			}
@@ -138,6 +156,10 @@ func Summarize(ctx context.Context, ai AIProvider, in SummarizeInput) (Summarize
 		}
 	}
 
+	if len(res.Drafts) == 0 && len(audiences) > 0 {
+		return res, FormatAIScanFailure(firstErr)
+	}
+
 	return res, nil
 }
 
@@ -161,8 +183,10 @@ func indexCommits(commits []Commit) map[string]Commit {
 // buildGroupInput assembles the AI input for one group from its member commits.
 func buildGroupInput(g CommitGroup, byID map[string]Commit) SummarizeGroupInput {
 	in := SummarizeGroupInput{
-		Label:     g.Label,
-		GroupType: string(g.GroupType),
+		Label:        g.Label,
+		GroupType:    string(g.GroupType),
+		IssueTitles:  []string{},
+		ChangedFiles: []string{},
 	}
 
 	var diffs, contexts []string
@@ -217,7 +241,7 @@ func buildGroupInput(g CommitGroup, byID map[string]Commit) SummarizeGroupInput 
 func collectSummaries(groups []CommitGroup) []string {
 	var out []string
 	for _, g := range groups {
-		if g.Summary != nil {
+		if g.Summary != nil && strings.TrimSpace(*g.Summary) != "" {
 			out = append(out, *g.Summary)
 		}
 	}

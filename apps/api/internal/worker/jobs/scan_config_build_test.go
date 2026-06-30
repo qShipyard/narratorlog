@@ -24,8 +24,11 @@ func TestBuildScanConfigPopulatesAIFromTeamConfig(t *testing.T) {
 			BaseURL:         "https://api.example",
 			Depth:           "deep",
 		},
+		Sources: map[string]teamconfig.Source{
+			"github": {TokenEncrypted: mustEncrypt(t, enc, "ghp_test")},
+		},
 	}
-	repo := db.Repository{FullName: "acme/app", DefaultBranch: "main", AccessToken: "gh-tok"}
+	repo := db.Repository{FullName: "acme/app", DefaultBranch: "main", Provider: "github"}
 
 	cfg, err := buildScanConfig(repo, time.Now().Add(-time.Hour), time.Now(), tc, enc)
 	if err != nil {
@@ -53,7 +56,10 @@ func TestBuildScanConfigResolvesSourceToken(t *testing.T) {
 	ct, _ := enc.Encrypt("ghp_scan")
 
 	tc := &teamconfig.Config{
-		AI: teamconfig.AI{Provider: "openai"},
+		AI: teamconfig.AI{
+			Provider:        "openai",
+			APIKeyEncrypted: mustEncrypt(t, enc, "sk-test"),
+		},
 		Sources: map[string]teamconfig.Source{
 			"github": {TokenEncrypted: ct, BaseURL: "https://ghes.example.com"},
 		},
@@ -79,8 +85,16 @@ func TestBuildScanConfigResolvesSourceToken(t *testing.T) {
 
 func TestBuildScanConfigDefaultsDepthWhenUnset(t *testing.T) {
 	enc, _ := auth.NewEncryptor("0123456789abcdef0123456789abcdef")
-	tc := &teamconfig.Config{AI: teamconfig.AI{Provider: "openai"}}
-	repo := db.Repository{FullName: "acme/app", DefaultBranch: "main"}
+	tc := &teamconfig.Config{
+		AI: teamconfig.AI{
+			Provider:        "openai",
+			APIKeyEncrypted: mustEncrypt(t, enc, "sk-test"),
+		},
+		Sources: map[string]teamconfig.Source{
+			"github": {TokenEncrypted: mustEncrypt(t, enc, "ghp_test")},
+		},
+	}
+	repo := db.Repository{FullName: "acme/app", DefaultBranch: "main", Provider: "github"}
 
 	cfg, err := buildScanConfig(repo, time.Now().Add(-time.Hour), time.Now(), tc, enc)
 	if err != nil {
@@ -89,7 +103,47 @@ func TestBuildScanConfigDefaultsDepthWhenUnset(t *testing.T) {
 	if cfg.AIDepth != "standard" {
 		t.Fatalf("expected standard depth fallback, got %q", cfg.AIDepth)
 	}
-	if cfg.AIAPIKey != "" {
-		t.Fatalf("expected empty key when none set, got %q", cfg.AIAPIKey)
+	if cfg.AIAPIKey != "sk-test" {
+		t.Fatalf("expected decrypted AI key, got %q", cfg.AIAPIKey)
 	}
+}
+
+func TestBuildScanConfigRequiresSourceToken(t *testing.T) {
+	enc, _ := auth.NewEncryptor("0123456789abcdef0123456789abcdef")
+	tc := &teamconfig.Config{
+		AI: teamconfig.AI{
+			Provider:        "openai",
+			APIKeyEncrypted: mustEncrypt(t, enc, "sk-test"),
+		},
+	}
+	repo := db.Repository{FullName: "acme/app", DefaultBranch: "main", Provider: "github"}
+
+	_, err := buildScanConfig(repo, time.Now().Add(-time.Hour), time.Now(), tc, enc)
+	if err == nil {
+		t.Fatal("expected error when source token missing")
+	}
+}
+
+func TestBuildScanConfigRequiresAIKey(t *testing.T) {
+	enc, _ := auth.NewEncryptor("0123456789abcdef0123456789abcdef")
+	tc := &teamconfig.Config{
+		Sources: map[string]teamconfig.Source{
+			"github": {TokenEncrypted: mustEncrypt(t, enc, "ghp_test")},
+		},
+	}
+	repo := db.Repository{FullName: "acme/app", DefaultBranch: "main", Provider: "github"}
+
+	_, err := buildScanConfig(repo, time.Now().Add(-time.Hour), time.Now(), tc, enc)
+	if err == nil {
+		t.Fatal("expected error when AI key missing")
+	}
+}
+
+func mustEncrypt(t *testing.T, enc *auth.Encryptor, plaintext string) string {
+	t.Helper()
+	ct, err := enc.Encrypt(plaintext)
+	if err != nil {
+		t.Fatalf("encrypt: %v", err)
+	}
+	return ct
 }

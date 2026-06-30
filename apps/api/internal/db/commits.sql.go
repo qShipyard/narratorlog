@@ -88,6 +88,39 @@ func (q *Queries) CreateCommit(ctx context.Context, arg CreateCommitParams) (Com
 	return i, err
 }
 
+const createCommitIgnoreDuplicate = `-- name: CreateCommitIgnoreDuplicate :exec
+INSERT INTO commits (
+  scan_id, repository_id, sha, message, author_name, author_email,
+  committed_at, pr_number, pr_title, pr_description, linked_issues,
+  changed_files, diff, is_noise, is_bot, is_breaking, domain
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+ON CONFLICT (scan_id, sha) DO NOTHING
+`
+
+func (q *Queries) CreateCommitIgnoreDuplicate(ctx context.Context, arg CreateCommitParams) error {
+	_, err := q.db.Exec(ctx, createCommitIgnoreDuplicate,
+		arg.ScanID,
+		arg.RepositoryID,
+		arg.Sha,
+		arg.Message,
+		arg.AuthorName,
+		arg.AuthorEmail,
+		arg.CommittedAt,
+		arg.PrNumber,
+		arg.PrTitle,
+		arg.PrDescription,
+		arg.LinkedIssues,
+		arg.ChangedFiles,
+		arg.Diff,
+		arg.IsNoise,
+		arg.IsBot,
+		arg.IsBreaking,
+		arg.Domain,
+	)
+	return err
+}
+
 const getCommitSHAsByScan = `-- name: GetCommitSHAsByScan :many
 SELECT sha FROM commits WHERE scan_id = $1
 `

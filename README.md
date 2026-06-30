@@ -56,8 +56,10 @@ docker compose -f deploy/docker-compose.quickstart.yml up --build
 ```
 
 This builds everything, runs the database migrations automatically, and starts the
-whole stack with safe localhost defaults — no `.env` and no config required. When it
-finishes, open **http://localhost:3000** and complete the first-run setup wizard.
+whole stack with safe localhost defaults — no `.env` and no config required. The
+first run downloads base images and compiles the API, worker, web app, and reader —
+expect several minutes before the stack is ready. When it finishes, open
+**http://localhost:3000** and complete the first-run setup wizard.
 
 > The quickstart uses insecure placeholder secrets and plain HTTP for local trials
 > only. For a real deployment, use the production setup below.
