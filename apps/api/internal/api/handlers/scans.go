@@ -388,4 +388,3 @@ func lookbackToTime(lookback string) time.Time {
 	}
 	return time.Now().UTC().Add(-d)
 }
-
