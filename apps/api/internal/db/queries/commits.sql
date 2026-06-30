@@ -7,6 +7,15 @@ INSERT INTO commits (
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 RETURNING *;
 
+-- name: CreateCommitIgnoreDuplicate :exec
+INSERT INTO commits (
+  scan_id, repository_id, sha, message, author_name, author_email,
+  committed_at, pr_number, pr_title, pr_description, linked_issues,
+  changed_files, diff, is_noise, is_bot, is_breaking, domain
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+ON CONFLICT (scan_id, sha) DO NOTHING;
+
 -- name: ListCommitsByScan :many
 SELECT * FROM commits
 WHERE scan_id = $1 AND is_noise = false

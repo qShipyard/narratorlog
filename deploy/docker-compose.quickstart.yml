@@ -13,8 +13,6 @@ services:
       POSTGRES_DB: narratorlog
       POSTGRES_USER: narratorlog
       POSTGRES_PASSWORD: narratorlog
-    # Published to the host so you can inspect the DB with a GUI (TablePlus etc.)
-    # at localhost:5433. Containers still reach it as postgres:5432 internally.
     ports:
       - "5433:5432"
     volumes:
@@ -53,6 +51,7 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.api
     image: narratorlog-api:local
+    pull_policy: build
     environment:
       - DATABASE_URL=postgresql://narratorlog:narratorlog@postgres:5432/narratorlog?sslmode=disable
       - REDIS_URL=redis://redis:6379
@@ -75,7 +74,11 @@ services:
         condition: service_started
 
   worker:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
     image: narratorlog-api:local
+    pull_policy: never
     entrypoint: ["./narratorlog-worker"]
     environment:
       - DATABASE_URL=postgresql://narratorlog:narratorlog@postgres:5432/narratorlog?sslmode=disable

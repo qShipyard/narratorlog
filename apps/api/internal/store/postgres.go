@@ -63,8 +63,26 @@ func (s *PostgresStore) UpdateScanCounts(ctx context.Context, scanID string, com
 // ─── Commits ──────────────────────────────────────────────────────────────────
 
 func (s *PostgresStore) SaveCommits(ctx context.Context, commits []pipeline.Commit) error {
+	if len(commits) == 0 {
+		return nil
+	}
+
+	scanID, err := uuid.Parse(commits[0].ScanID)
+	if err != nil {
+		return fmt.Errorf("invalid scan ID: %w", err)
+	}
+
+	scan, err := s.q.GetScanByID(ctx, scanID)
+	if err != nil {
+		return fmt.Errorf("failed to lookup scan for commits: %w", err)
+	}
+
 	for _, c := range commits {
-		scanID, err := uuid.Parse(c.ScanID)
+		if c.ScanID != commits[0].ScanID {
+			return fmt.Errorf("commits span multiple scans")
+		}
+
+		commitScanID, err := uuid.Parse(c.ScanID)
 		if err != nil {
 			return fmt.Errorf("invalid scan ID: %w", err)
 		}
@@ -79,9 +97,9 @@ func (s *PostgresStore) SaveCommits(ctx context.Context, commits []pipeline.Comm
 			return fmt.Errorf("failed to marshal changed files: %w", err)
 		}
 
-		_, err = s.q.CreateCommit(ctx, db.CreateCommitParams{
-			ScanID:        scanID,
-			RepositoryID:  uuid.Nil, // set by caller via scan lookup
+		err = s.q.CreateCommitIgnoreDuplicate(ctx, db.CreateCommitParams{
+			ScanID:        commitScanID,
+			RepositoryID:  scan.RepositoryID,
 			Sha:           c.SHA,
 			Message:       c.Message,
 			AuthorName:    c.AuthorName,
