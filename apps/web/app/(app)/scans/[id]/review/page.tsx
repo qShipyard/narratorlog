@@ -1,51 +1,94 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { scansApi, draftsApi, AudienceDraft, ScanStatus } from '@/lib/api'
+import { scansApi, draftsApi, teamApi, AudienceDraft, ScanStatus } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { PipelineTimeline, isLiveStatus } from '@/components/pipeline-timeline'
 import { NarrationProse } from '@/components/narration-prose'
 import { StatusLine, ScanGroups } from '@/components/scan-bits'
-import { CheckCircle, XCircle, RefreshCw, Send, ChevronLeft, Check } from 'lucide-react'
-import { useState, use } from 'react'
+import { CheckCircle, XCircle, RefreshCw, Send, ChevronLeft, Check, AlertCircle } from 'lucide-react'
+import { useState, use, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import {
+  isAwaitingDrafts,
+  shouldPollScanResources,
+  shouldPollScanStatus,
+} from '@/lib/scan-polling'
 
-function shouldPoll(status?: ScanStatus) {
-  return status ? isLiveStatus(status) || status === 'pending' : false
+function apiErrorMessage(err: unknown, fallback: string) {
+  return (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+    ?.message ?? fallback
 }
 
 export default function ReviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const queryClient = useQueryClient()
+  const prevStatus = useRef<ScanStatus | undefined>(undefined)
 
   const { data: scan } = useQuery({
     queryKey: ['scan', id],
     queryFn: () => scansApi.get(id).then(r => r.data),
-    refetchInterval: q => (shouldPoll(q.state.data?.status) ? 3000 : false),
+    refetchInterval: q => (shouldPollScanStatus(q.state.data?.status) ? 3000 : false),
+  })
+
+  const { data: teamConfig } = useQuery({
+    queryKey: ['team-config'],
+    queryFn: () => teamApi.getConfig().then(r => r.data),
   })
 
   const status = scan?.status
   const live = status ? isLiveStatus(status) : false
+  const hasRouting = (teamConfig?.routing?.length ?? 0) > 0
+
+  useEffect(() => {
+    if (prevStatus.current === 'delivering' && status === 'delivered') {
+      toast.success('Delivered to your channels.')
+    }
+    prevStatus.current = status
+  }, [status])
 
   const { data: groupsData } = useQuery({
     queryKey: ['scan-groups', id],
     queryFn: () => scansApi.groups(id).then(r => r.data),
-    refetchInterval: shouldPoll(status) ? 4000 : false,
+    refetchInterval: () => {
+      const scanData = queryClient.getQueryData<{ status: ScanStatus }>(['scan', id])
+      const draftsCache = queryClient.getQueryData<{ data: unknown[] }>(['scan-drafts', id])
+      const groupsCache = queryClient.getQueryData<{ data: unknown[] }>(['scan-groups', id])
+      return shouldPollScanResources(
+        scanData?.status ?? status,
+        draftsCache?.data?.length ?? 0,
+        groupsCache?.data?.length ?? 0,
+      )
+        ? 3000
+        : false
+    },
   })
 
   const { data: draftsData, refetch: refetchDrafts } = useQuery({
     queryKey: ['scan-drafts', id],
     queryFn: () => scansApi.drafts(id).then(r => r.data),
-    refetchInterval: shouldPoll(status) ? 4000 : false,
+    refetchInterval: () => {
+      const scanData = queryClient.getQueryData<{ status: ScanStatus }>(['scan', id])
+      const draftsCache = queryClient.getQueryData<{ data: unknown[] }>(['scan-drafts', id])
+      const groupsCache = queryClient.getQueryData<{ data: unknown[] }>(['scan-groups', id])
+      return shouldPollScanResources(
+        scanData?.status ?? status,
+        draftsCache?.data?.length ?? 0,
+        groupsCache?.data?.length ?? 0,
+      )
+        ? 3000
+        : false
+    },
   })
 
   const groups = groupsData?.data ?? []
   const drafts = draftsData?.data ?? []
+  const waitingForDrafts = isAwaitingDrafts(status, drafts.length, groups.length)
 
   const allApproved = drafts.length > 0 && drafts.every(d => d.status === 'approved')
   const approvedCount = drafts.filter(d => d.status === 'approved').length
@@ -53,10 +96,11 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
   const deliverMutation = useMutation({
     mutationFn: () => scansApi.deliver(id),
     onSuccess: () => {
-      toast.success('Delivery queued.')
+      toast.success('Sending to your channels…')
       queryClient.invalidateQueries({ queryKey: ['scan', id] })
+      queryClient.invalidateQueries({ queryKey: ['scan-drafts', id] })
     },
-    onError: () => toast.error('Failed to queue delivery.'),
+    onError: (err) => toast.error(apiErrorMessage(err, 'Could not deliver. Try again.')),
   })
 
   return (
@@ -88,14 +132,36 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
                 {approvedCount}/{drafts.length} approved
               </span>
               <Button
-                disabled={!allApproved || deliverMutation.isPending}
+                disabled={!allApproved || !hasRouting || deliverMutation.isPending || status === 'delivering'}
                 onClick={() => deliverMutation.mutate()}
               >
                 <Send className="h-4 w-4 mr-2" />
-                Deliver all
+                {status === 'delivering' ? 'Delivering…' : status === 'delivered' ? 'Delivered' : 'Deliver all'}
               </Button>
             </div>
           </div>
+
+          {!hasRouting && allApproved && status !== 'delivered' && (
+            <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-5 py-4">
+              <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-2">
+                <p className="text-sm">
+                  No delivery destinations yet. Add a route in Settings to send approved drafts to Slack, email, or another channel.
+                </p>
+                <Link href="/settings#delivery">
+                  <Button variant="outline" size="sm">Set up delivery</Button>
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {status === 'delivered' && (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-5 py-4">
+              <p className="text-sm text-emerald-400">
+                All routed drafts were sent. Check your channels for the published updates.
+              </p>
+            </div>
+          )}
 
           {status && (
             <div className="rounded-xl border bg-card/60 px-5 py-4">
@@ -118,7 +184,7 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
             {/* Source — the machine record */}
             <section className="space-y-3">
               <p className="eyebrow">Source · what shipped</p>
-              <ScanGroups groups={groups} live={live} />
+              <ScanGroups groups={groups} live={live || waitingForDrafts} />
             </section>
 
             {/* Narration — the human story */}
@@ -126,7 +192,7 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
               <p className="eyebrow">Narration · the story</p>
               {drafts.length === 0 ? (
                 <div className="rounded-xl border bg-card px-5 py-16 text-center">
-                  {live ? (
+                  {live || waitingForDrafts ? (
                     <p className="font-serif text-lg italic text-muted-foreground">
                       The story is still being written…
                     </p>

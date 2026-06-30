@@ -48,12 +48,6 @@ func (p *DeliveryProcessor) ProcessTask(ctx context.Context, t *asynq.Task) erro
 		return fmt.Errorf("failed to fetch scan: %w", err)
 	}
 
-	outputCfg, err := parseScanOutputConfig(scan.ConfigSnapshot)
-	if err != nil {
-		log.Printf("[delivery] failed to parse config scan_id=%s err=%v", payload.ScanID, err)
-		outputCfg = &ScanOutputConfig{}
-	}
-
 	drafts, err := p.queries.ListDraftsByScan(ctx, scanID)
 	if err != nil {
 		return fmt.Errorf("failed to fetch drafts: %w", err)
@@ -71,6 +65,27 @@ func (p *DeliveryProcessor) ProcessTask(ctx context.Context, t *asynq.Task) erro
 	tc, err := teamconfig.Parse(rawCfg)
 	if err != nil {
 		return fmt.Errorf("failed to parse team config: %w", err)
+	}
+
+	outputCfg := outputConfigFromRouting(tc.Routing)
+	if len(outputCfg.Outputs) == 0 {
+		snap, snapErr := parseScanOutputConfig(scan.ConfigSnapshot)
+		if snapErr != nil {
+			log.Printf("[delivery] failed to parse config scan_id=%s err=%v", payload.ScanID, snapErr)
+			outputCfg = &ScanOutputConfig{}
+		} else {
+			outputCfg = snap
+		}
+	}
+	if len(outputCfg.Outputs) == 0 {
+		return fmt.Errorf("no delivery destinations configured")
+	}
+
+	if err := p.queries.UpdateScanStatus(ctx, db.UpdateScanStatusParams{
+		Status: db.ScanStatusDelivering,
+		ID:     scanID,
+	}); err != nil {
+		return fmt.Errorf("failed to update scan status: %w", err)
 	}
 
 	var failed []string
@@ -109,8 +124,19 @@ func (p *DeliveryProcessor) ProcessTask(ctx context.Context, t *asynq.Task) erro
 	if len(failed) > 0 {
 		log.Printf("[delivery] completed with %d failures scan_id=%s failed=%v",
 			len(failed), payload.ScanID, failed)
-	} else {
-		log.Printf("[delivery] completed scan_id=%s", payload.ScanID)
+		_ = p.queries.UpdateScanStatus(ctx, db.UpdateScanStatusParams{
+			Status: db.ScanStatusAwaitingApproval,
+			ID:     scanID,
+		})
+		return fmt.Errorf("delivery failed for %d destination(s)", len(failed))
+	}
+
+	log.Printf("[delivery] completed scan_id=%s", payload.ScanID)
+	if err := p.queries.UpdateScanStatus(ctx, db.UpdateScanStatusParams{
+		Status: db.ScanStatusDelivered,
+		ID:     scanID,
+	}); err != nil {
+		return fmt.Errorf("failed to mark scan delivered: %w", err)
 	}
 
 	return nil

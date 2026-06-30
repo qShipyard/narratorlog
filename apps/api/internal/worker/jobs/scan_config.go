@@ -3,6 +3,8 @@ package jobs
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/narratorlog/narratorlog/internal/teamconfig"
 )
 
 // OutputConfig is one output destination from the scan config.
@@ -29,6 +31,18 @@ func parseScanOutputConfig(configSnapshot []byte) (*ScanOutputConfig, error) {
 	}
 
 	return &cfg, nil
+}
+
+func outputConfigFromRouting(routing []teamconfig.Output) *ScanOutputConfig {
+	cfg := &ScanOutputConfig{Outputs: make([]OutputConfig, 0, len(routing))}
+	for _, r := range routing {
+		cfg.Outputs = append(cfg.Outputs, OutputConfig{
+			Audience: r.Audience,
+			Plugin:   r.Plugin,
+			Config:   r.Config,
+		})
+	}
+	return cfg
 }
 
 // OutputsForAudience returns all output configs for a given audience ID.

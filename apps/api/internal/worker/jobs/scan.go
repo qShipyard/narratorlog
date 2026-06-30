@@ -7,7 +7,9 @@ import (
 	"log"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/narratorlog/narratorlog/internal/auth"
 	db "github.com/narratorlog/narratorlog/internal/db"
@@ -17,24 +19,86 @@ import (
 )
 
 type ScanProcessor struct {
-	pool    *pgxpool.Pool
-	queries *db.Queries
-	enc     *auth.Encryptor
+	pool     *pgxpool.Pool
+	queries  *db.Queries
+	enc      *auth.Encryptor
+	resolver *PluginResolver
+	runner   *pipeline.PluginRunner
 }
 
 func NewScanProcessor(pool *pgxpool.Pool, enc *auth.Encryptor) *ScanProcessor {
 	return &ScanProcessor{
-		pool:    pool,
-		queries: db.New(pool),
-		enc:     enc,
+		pool:     pool,
+		queries:  db.New(pool),
+		enc:      enc,
+		resolver: NewPluginResolver(),
+		runner:   pipeline.NewPluginRunner(),
 	}
 }
 
-func (p *ScanProcessor) ProcessTask(ctx context.Context, t *asynq.Task) error {
+// pluginSource adapts the subprocess PluginRunner to the pipeline's CommitSource.
+type pluginSource struct {
+	runner *pipeline.PluginRunner
+	path   string
+}
+
+func (s pluginSource) Fetch(ctx context.Context, req pipeline.SourcePluginRequest) (*pipeline.SourcePluginResponse, error) {
+	return s.runner.CallSourcePlugin(ctx, s.path, req)
+}
+
+// pluginAI adapts the subprocess PluginRunner to the pipeline's AIProvider.
+type pluginAI struct {
+	runner *pipeline.PluginRunner
+	path   string
+}
+
+func (a pluginAI) Summarize(ctx context.Context, req pipeline.SummarizePluginRequest) (*pipeline.SummarizePluginResponse, error) {
+	return a.runner.CallSummarize(ctx, a.path, req)
+}
+
+func (a pluginAI) Generate(ctx context.Context, req pipeline.GeneratePluginRequest) (*pipeline.GeneratePluginResponse, error) {
+	return a.runner.CallGenerate(ctx, a.path, req)
+}
+
+// markScanFailed records a terminal failure on a background context so the scan
+// never stays stuck "running" even when the job's context is already cancelled.
+func (p *ScanProcessor) markScanFailed(scanID, reason string) {
+	id, err := uuid.Parse(scanID)
+	if err != nil {
+		return
+	}
+	_ = p.queries.UpdateScanStatusWithError(context.Background(), db.UpdateScanStatusWithErrorParams{
+		Status: db.ScanStatusFailed,
+		Error:  pgtype.Text{String: reason, Valid: true},
+		ID:     id,
+	})
+}
+
+func (p *ScanProcessor) ProcessTask(ctx context.Context, t *asynq.Task) (err error) {
 	var payload ScanPayload
 	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
 		return fmt.Errorf("failed to unmarshal scan payload: %w", err)
 	}
+
+	// Any failure or panic past this point marks the scan failed, so it never
+	// hangs in "running" the way a nil plugin once did.
+	defer func() {
+		if rec := recover(); rec != nil {
+			err = fmt.Errorf("scan panicked: %v", rec)
+		}
+		if err == nil {
+			return
+		}
+		retryCount, _ := asynq.GetRetryCount(ctx)
+		maxRetry, _ := asynq.GetMaxRetry(ctx)
+		if retryCount < maxRetry {
+			log.Printf("[scan] attempt failed scan_id=%s retry=%d/%d err=%v",
+				payload.ScanID, retryCount, maxRetry, err)
+			return
+		}
+		log.Printf("[scan] failed scan_id=%s err=%v", payload.ScanID, err)
+		p.markScanFailed(payload.ScanID, err.Error())
+	}()
 
 	log.Printf("[scan] starting scan_id=%s repo_id=%s", payload.ScanID, payload.RepositoryID)
 
@@ -60,14 +124,23 @@ func (p *ScanProcessor) ProcessTask(ctx context.Context, t *asynq.Task) error {
 	if err != nil {
 		return err
 	}
-	st := store.NewPostgresStore(p.pool)
+	sourcePath, err := p.resolver.SourcePlugin(string(repo.Provider))
+	if err != nil {
+		return err
+	}
+	aiPath, err := p.resolver.AIPlugin(tc.AI.Provider)
+	if err != nil {
+		return err
+	}
 
+	st := store.NewPostgresStore(p.pool)
 	runner := &pipeline.Runner{
 		Store:  st,
+		Source: pluginSource{runner: p.runner, path: sourcePath},
+		AI:     pluginAI{runner: p.runner, path: aiPath},
 		Config: cfg,
 	}
-	if err := runner.Run(ctx, payload.ScanID); err != nil {
-		log.Printf("[scan] failed scan_id=%s err=%v", payload.ScanID, err)
+	if err = runner.Run(ctx, payload.ScanID); err != nil {
 		return err
 	}
 
@@ -158,9 +231,15 @@ func buildScanConfig(
 	if err != nil {
 		return pipeline.ScanConfig{}, fmt.Errorf("failed to decrypt source token: %w", err)
 	}
-	if ok {
-		cfg.AccessToken = token
-		cfg.SourceBaseURL = baseURL
+	if !ok || token == "" {
+		return pipeline.ScanConfig{}, fmt.Errorf("No git access token configured for %s. Go to Settings → Git sources and add a personal access token.", repo.Provider)
 	}
+	cfg.AccessToken = token
+	cfg.SourceBaseURL = baseURL
+
+	if tc.AI.APIKeyEncrypted == "" {
+		return pipeline.ScanConfig{}, fmt.Errorf("No AI API key configured. Go to Settings → AI provider and add your API key.")
+	}
+
 	return cfg, nil
 }

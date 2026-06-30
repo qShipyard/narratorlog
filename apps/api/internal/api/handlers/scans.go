@@ -9,6 +9,7 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgtype"
 	db "github.com/narratorlog/narratorlog/internal/db"
+	"github.com/narratorlog/narratorlog/internal/teamconfig"
 	"github.com/narratorlog/narratorlog/internal/worker/jobs"
 )
 
@@ -99,6 +100,38 @@ func (h *Handler) TriggerScan(c *gin.Context) {
 	repoID, err := uuid.Parse(req.RepositoryID)
 	if err != nil {
 		errorResponse(c, http.StatusBadRequest, "INVALID_ID", "Invalid repository ID.")
+		return
+	}
+
+	repo, err := h.queries.GetRepositoryByID(c.Request.Context(), repoID)
+	if err != nil {
+		errorResponse(c, http.StatusNotFound, "NOT_FOUND", "Repository not found.")
+		return
+	}
+	if repo.TeamID != teamID {
+		errorResponse(c, http.StatusForbidden, "FORBIDDEN", "You don't have permission to scan this repository.")
+		return
+	}
+
+	rawCfg, err := h.queries.GetTeamConfig(c.Request.Context(), teamID)
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to load team settings.")
+		return
+	}
+	tc, err := teamconfig.Parse(rawCfg)
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to parse team settings.")
+		return
+	}
+	if _, _, ok, err := tc.DecryptedSource(string(repo.Provider), h.encryptor); err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to read git source settings.")
+		return
+	} else if !ok {
+		errorResponse(c, http.StatusConflict, "SOURCE_NOT_CONNECTED", "Add a git access token in Settings → Git sources before running a scan.")
+		return
+	}
+	if tc.AI.APIKeyEncrypted == "" {
+		errorResponse(c, http.StatusConflict, "AI_NOT_CONFIGURED", "Add an AI API key in Settings → AI provider before running a scan.")
 		return
 	}
 
@@ -255,6 +288,30 @@ func (h *Handler) DeliverScan(c *gin.Context) {
 	}
 
 	teamID, _ := uuid.Parse(c.GetString("team_id"))
+	rawCfg, err := h.queries.GetTeamConfig(c.Request.Context(), teamID)
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to load team settings.")
+		return
+	}
+	tc, err := teamconfig.Parse(rawCfg)
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to parse team settings.")
+		return
+	}
+	if len(tc.Routing) == 0 {
+		errorResponse(c, http.StatusUnprocessableEntity, "NO_ROUTING",
+			"No delivery destinations configured. Go to Settings → Delivery and add a route for each audience you want to publish to.")
+		return
+	}
+
+	if err := h.queries.UpdateScanStatus(c.Request.Context(), db.UpdateScanStatusParams{
+		Status: db.ScanStatusDelivering,
+		ID:     id,
+	}); err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to start delivery.")
+		return
+	}
+
 	payload, _ := jobs.Marshal(jobs.DeliveryPayload{
 		ScanID: id.String(),
 		TeamID: teamID.String(),
@@ -262,11 +319,15 @@ func (h *Handler) DeliverScan(c *gin.Context) {
 
 	task := asynq.NewTask(jobs.JobDeliver, payload)
 	if _, err := h.asynq.Enqueue(task); err != nil {
+		_ = h.queries.UpdateScanStatus(c.Request.Context(), db.UpdateScanStatusParams{
+			Status: db.ScanStatusAwaitingApproval,
+			ID:     id,
+		})
 		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to queue delivery.")
 		return
 	}
 
-	c.JSON(http.StatusAccepted, gin.H{"message": "Delivery queued."})
+	c.JSON(http.StatusAccepted, gin.H{"message": "Delivery started.", "status": "delivering"})
 }
 
 func (h *Handler) CancelScan(c *gin.Context) {
@@ -302,6 +363,9 @@ func scanToJSON(s db.Scan, repo *db.Repository) gin.H {
 		"created_at":     s.CreatedAt,
 		"updated_at":     s.UpdatedAt,
 	}
+	if hint := scanErrorHint(s.Error); hint != nil && s.Status == db.ScanStatusFailed {
+		h["error_hint"] = *hint
+	}
 	if repo != nil {
 		h["repository"] = gin.H{
 			"id":        repo.ID,
@@ -324,4 +388,3 @@ func lookbackToTime(lookback string) time.Time {
 	}
 	return time.Now().UTC().Add(-d)
 }
-

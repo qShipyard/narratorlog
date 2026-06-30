@@ -18,6 +18,7 @@ type Querier interface {
 	CreateAudienceDraft(ctx context.Context, arg CreateAudienceDraftParams) (AudienceDraft, error)
 	CreateAuditLog(ctx context.Context, arg CreateAuditLogParams) error
 	CreateCommit(ctx context.Context, arg CreateCommitParams) (Commit, error)
+	CreateCommitIgnoreDuplicate(ctx context.Context, arg CreateCommitParams) error
 	CreateCommitGroup(ctx context.Context, arg CreateCommitGroupParams) (CommitGroup, error)
 	CreateDelivery(ctx context.Context, arg CreateDeliveryParams) (Delivery, error)
 	CreateDraftComment(ctx context.Context, arg CreateDraftCommentParams) (DraftComment, error)

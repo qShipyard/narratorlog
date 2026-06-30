@@ -33,7 +33,7 @@ type Runner struct {
 }
 
 // Run executes stages 1-7 for a scan. Stage 8 runs separately after approval.
-// On any unrecoverable error the scan is marked failed before returning.
+// On error the worker job marks the scan failed after retries are exhausted.
 func (r *Runner) Run(ctx context.Context, scanID string) error {
 	stages := []struct {
 		name string
@@ -50,8 +50,6 @@ func (r *Runner) Run(ctx context.Context, scanID string) error {
 
 	for _, stage := range stages {
 		if err := stage.fn(ctx, scanID); err != nil {
-			msg := err.Error()
-			_ = r.Store.UpdateScanStatus(ctx, scanID, ScanStatusFailed, &msg)
 			return err
 		}
 	}
@@ -63,6 +61,14 @@ func (r *Runner) Run(ctx context.Context, scanID string) error {
 func (r *Runner) stageScan(ctx context.Context, scanID string) error {
 	if err := r.Store.UpdateScanStatus(ctx, scanID, ScanStatusRunning, nil); err != nil {
 		return err
+	}
+
+	existing, err := r.Store.GetCommits(ctx, scanID, true)
+	if err != nil {
+		return err
+	}
+	if len(existing) > 0 {
+		return nil
 	}
 
 	resp, err := r.Source.Fetch(ctx, SourcePluginRequest{
@@ -108,7 +114,7 @@ func (r *Runner) stageFilter(ctx context.Context, scanID string) error {
 			return err
 		}
 	}
-	return nil
+	return r.Store.UpdateScanCounts(ctx, scanID, len(result.Kept), len(result.Filtered))
 }
 
 func (r *Runner) stageEnrich(ctx context.Context, scanID string) error {
@@ -141,6 +147,14 @@ func (r *Runner) stageContext(ctx context.Context, scanID string) error {
 func (r *Runner) stageChunk(ctx context.Context, scanID string) error {
 	if err := r.Store.UpdateScanStatus(ctx, scanID, ScanStatusChunking, nil); err != nil {
 		return err
+	}
+
+	existing, err := r.Store.GetCommitGroups(ctx, scanID)
+	if err != nil {
+		return err
+	}
+	if len(existing) > 0 {
+		return nil
 	}
 
 	commits, err := r.Store.GetCommits(ctx, scanID, false)
@@ -188,6 +202,7 @@ func (r *Runner) stageSummarize(ctx context.Context, scanID string) error {
 			return err
 		}
 	}
+
 	return nil
 }
 

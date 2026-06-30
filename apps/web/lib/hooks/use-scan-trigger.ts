@@ -16,6 +16,11 @@ export function useScanTrigger() {
       qc.invalidateQueries({ queryKey: ['scans'] })
       qc.invalidateQueries({ queryKey: ['repos'] })
     },
-    onError: () => toast.error('Failed to trigger scan.'),
+    onError: (err: unknown) => {
+      const message =
+        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+          ?.message ?? 'Failed to trigger scan.'
+      toast.error(message)
+    },
   })
 }

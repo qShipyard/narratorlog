@@ -57,6 +57,8 @@ export interface Scan {
   scan_to: string
   commit_count: number
   filtered_count: number
+  error?: string | null
+  error_hint?: string
   drafts_pending: number
   drafts_approved: number
   created_at: string

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -121,8 +122,11 @@ func (p *PluginRunner) CallSummarize(
 		return nil, fmt.Errorf("failed to parse summarize response: %w", err)
 	}
 
-	if resp.Error != nil {
+	if resp.Error != nil && strings.TrimSpace(*resp.Error) != "" {
 		return nil, fmt.Errorf("summarize plugin returned error: %s", *resp.Error)
+	}
+	if strings.TrimSpace(resp.Summary) == "" {
+		return nil, fmt.Errorf("summarize plugin returned empty summary")
 	}
 
 	return &resp, nil
@@ -146,8 +150,11 @@ func (p *PluginRunner) CallGenerate(
 		return nil, fmt.Errorf("failed to parse generate response: %w", err)
 	}
 
-	if resp.Error != nil {
+	if resp.Error != nil && strings.TrimSpace(*resp.Error) != "" {
 		return nil, fmt.Errorf("generate plugin returned error: %s", *resp.Error)
+	}
+	if strings.TrimSpace(resp.Content) == "" {
+		return nil, fmt.Errorf("generate plugin returned empty content")
 	}
 
 	return &resp, nil
