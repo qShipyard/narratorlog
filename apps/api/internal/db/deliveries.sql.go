@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createDelivery = `-- name: CreateDelivery :one
@@ -64,6 +65,68 @@ func (q *Queries) ListDeliveriesByDraft(ctx context.Context, draftID uuid.UUID) 
 			&i.DeliveredAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDeliveriesByScan = `-- name: ListDeliveriesByScan :many
+SELECT
+  d.id,
+  d.draft_id,
+  d.output_plugin,
+  d.status,
+  d.response,
+  d.attempt_count,
+  d.delivered_at,
+  d.created_at,
+  d.updated_at,
+  ad.audience_id
+FROM deliveries d
+INNER JOIN audience_drafts ad ON ad.id = d.draft_id
+WHERE ad.scan_id = $1
+ORDER BY d.created_at ASC
+`
+
+type ListDeliveriesByScanRow struct {
+	ID           uuid.UUID          `json:"id"`
+	DraftID      uuid.UUID          `json:"draft_id"`
+	OutputPlugin string             `json:"output_plugin"`
+	Status       DeliveryStatus     `json:"status"`
+	Response     []byte             `json:"response"`
+	AttemptCount int32              `json:"attempt_count"`
+	DeliveredAt  pgtype.Timestamptz `json:"delivered_at"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	AudienceID   string             `json:"audience_id"`
+}
+
+func (q *Queries) ListDeliveriesByScan(ctx context.Context, scanID uuid.UUID) ([]ListDeliveriesByScanRow, error) {
+	rows, err := q.db.Query(ctx, listDeliveriesByScan, scanID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDeliveriesByScanRow
+	for rows.Next() {
+		var i ListDeliveriesByScanRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.DraftID,
+			&i.OutputPlugin,
+			&i.Status,
+			&i.Response,
+			&i.AttemptCount,
+			&i.DeliveredAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.AudienceID,
 		); err != nil {
 			return nil, err
 		}

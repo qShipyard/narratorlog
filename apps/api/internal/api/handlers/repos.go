@@ -114,7 +114,7 @@ func (h *Handler) ConnectRepo(c *gin.Context) {
 		FullName:      req.FullName,
 		Url:           req.URL,
 		DefaultBranch: req.DefaultBranch,
-		AccessToken:   "",
+		AccessToken:   pgtype.Text{},
 		WebhookSecret: pgtype.Text{String: webhookSecret, Valid: true},
 		Config:        []byte("{}"),
 	})

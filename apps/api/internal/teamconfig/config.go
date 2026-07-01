@@ -31,11 +31,12 @@ type Source struct {
 }
 
 type Config struct {
-	AI           AI                           `json:"ai"`
-	Privacy      Privacy                      `json:"privacy"`
-	Integrations map[string]map[string]string `json:"integrations"`
-	Sources      map[string]Source            `json:"sources,omitempty"`
-	Routing      []Output                     `json:"routing"`
+	AI                 AI                           `json:"ai"`
+	Privacy            Privacy                      `json:"privacy"`
+	Integrations       map[string]map[string]string `json:"integrations"`
+	Sources            map[string]Source            `json:"sources,omitempty"`
+	Routing            []Output                     `json:"routing"`
+	ActivationComplete bool                         `json:"activation_complete,omitempty"`
 }
 
 func Parse(raw []byte) (*Config, error) {
@@ -78,11 +79,12 @@ type SourceUpdate struct {
 }
 
 type UpdateRequest struct {
-	AI           AIUpdate                     `json:"ai"`
-	Privacy      Privacy                      `json:"privacy"`
-	Integrations map[string]map[string]string `json:"integrations"` // plaintext; empty value means "keep existing"
-	Sources      map[string]SourceUpdate      `json:"sources"`
-	Routing      []Output                     `json:"routing"`
+	AI                 AIUpdate                     `json:"ai"`
+	Privacy            Privacy                      `json:"privacy"`
+	Integrations       map[string]map[string]string `json:"integrations"` // plaintext; empty value means "keep existing"
+	Sources            map[string]SourceUpdate      `json:"sources"`
+	Routing            []Output                     `json:"routing"`
+	ActivationComplete bool                         `json:"activation_complete"`
 }
 
 func (c *Config) ApplyUpdate(in UpdateRequest, enc *auth.Encryptor) error {
@@ -136,6 +138,7 @@ func (c *Config) ApplyUpdate(in UpdateRequest, enc *auth.Encryptor) error {
 	}
 
 	c.Routing = in.Routing
+	c.ActivationComplete = in.ActivationComplete
 	return nil
 }
 
@@ -155,11 +158,12 @@ type SourceView struct {
 }
 
 type ClientView struct {
-	AI           AIView                     `json:"ai"`
-	Privacy      Privacy                    `json:"privacy"`
-	Integrations map[string]map[string]bool `json:"integrations"`
-	Sources      map[string]SourceView      `json:"sources"`
-	Routing      []Output                   `json:"routing"`
+	AI                 AIView                     `json:"ai"`
+	Privacy            Privacy                    `json:"privacy"`
+	Integrations       map[string]map[string]bool `json:"integrations"`
+	Sources            map[string]SourceView      `json:"sources"`
+	Routing            []Output                   `json:"routing"`
+	ActivationComplete bool                       `json:"activation_complete"`
 }
 
 func (c *Config) View() ClientView {
@@ -185,10 +189,11 @@ func (c *Config) View() ClientView {
 			Depth:     c.AI.Depth,
 			APIKeySet: c.AI.APIKeyEncrypted != "",
 		},
-		Privacy:      c.Privacy,
-		Integrations: integrations,
-		Sources:      sources,
-		Routing:      c.Routing,
+		Privacy:            c.Privacy,
+		Integrations:       integrations,
+		Sources:            sources,
+		Routing:            c.Routing,
+		ActivationComplete: c.ActivationComplete,
 	}
 }
 

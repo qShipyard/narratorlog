@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { teamApi, TeamConfigUpdate, RoutingEntry, configViewToUpdate } from '@/lib/api'
@@ -8,40 +8,52 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PageHeader } from '@/components/page-header'
 import { KeyField, KeyGuideId } from '@/components/key-field'
+import { LedgerPanel } from '@/components/ledger-list'
 
-const SECTIONS = [
-  { id: 'ai', label: 'AI provider' },
+const TABS = [
+  { id: 'ai', label: 'AI writer' },
   { id: 'delivery', label: 'Delivery' },
-  { id: 'sources', label: 'Git sources' },
+  { id: 'sources', label: 'Git access' },
   { id: 'privacy', label: 'Privacy' },
-]
+] as const
+
+type SettingsTab = (typeof TABS)[number]['id']
+
+function isSettingsTab(value: string): value is SettingsTab {
+  return TABS.some(t => t.id === value)
+}
+
+function tabFromHash(): SettingsTab {
+  if (typeof window === 'undefined') return 'ai'
+  const hash = window.location.hash.replace('#', '')
+  return isSettingsTab(hash) ? hash : 'ai'
+}
 
 function Section({
-  id,
   eyebrow,
   title,
   description,
   children,
 }: {
-  id: string
   eyebrow: string
   title: string
   description?: string
   children: React.ReactNode
 }) {
   return (
-    <section id={id} className="scroll-mt-8 rounded-xl border bg-card p-6 space-y-5">
+    <LedgerPanel className="p-6 space-y-5">
       <div>
         <p className="eyebrow">{eyebrow}</p>
         <h2 className="font-display text-lg font-semibold mt-1">{title}</h2>
         {description && (
-          <p className="text-muted-foreground text-sm mt-1">{description}</p>
+          <p className="text-muted-foreground text-sm mt-1 max-w-prose">{description}</p>
         )}
       </div>
       {children}
-    </section>
+    </LedgerPanel>
   )
 }
 
@@ -58,9 +70,11 @@ const INTEGRATION_SECRET: Record<string, string> = {
 
 export default function SettingsPage() {
   const qc = useQueryClient()
+  const [tab, setTab] = useState<SettingsTab>('ai')
+
   const { data, isLoading } = useQuery({
     queryKey: ['team-config'],
-    queryFn: () => teamApi.getConfig().then((r) => r.data),
+    queryFn: () => teamApi.getConfig().then(r => r.data),
   })
 
   const [form, setForm] = useState<TeamConfigUpdate | null>(null)
@@ -71,13 +85,28 @@ export default function SettingsPage() {
     setForm(configViewToUpdate(data))
   }
 
+  useEffect(() => {
+    setTab(tabFromHash())
+    function onHashChange() {
+      setTab(tabFromHash())
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
+
+  function selectTab(next: string) {
+    if (!isSettingsTab(next)) return
+    setTab(next)
+    window.history.replaceState(null, '', `#${next}`)
+  }
+
   const save = useMutation({
     mutationFn: (payload: TeamConfigUpdate) => teamApi.updateConfig(payload),
     onSuccess: () => {
       toast.success('Settings saved.')
       qc.invalidateQueries({ queryKey: ['team-config'] })
     },
-    onError: () => toast.error('Failed to save settings.'),
+    onError: () => toast.error("Couldn't save settings. Try again."),
   })
 
   if (isLoading || !form) {
@@ -86,13 +115,13 @@ export default function SettingsPage() {
 
   function setIntegrationSecret(plugin: string, value: string) {
     const envVar = INTEGRATION_SECRET[plugin]
-    setForm((f) =>
+    setForm(f =>
       f ? { ...f, integrations: { ...f.integrations, [plugin]: { [envVar]: value } } } : f,
     )
   }
 
   function addRouting() {
-    setForm((f) =>
+    setForm(f =>
       f
         ? {
             ...f,
@@ -106,7 +135,7 @@ export default function SettingsPage() {
   }
 
   function updateRouting(i: number, patch: Partial<RoutingEntry>) {
-    setForm((f) => {
+    setForm(f => {
       if (!f) return f
       const routing = f.routing.map((r, idx) => (idx === i ? { ...r, ...patch } : r))
       return { ...f, routing }
@@ -114,11 +143,11 @@ export default function SettingsPage() {
   }
 
   function removeRouting(i: number) {
-    setForm((f) => (f ? { ...f, routing: f.routing.filter((_, idx) => idx !== i) } : f))
+    setForm(f => (f ? { ...f, routing: f.routing.filter((_, idx) => idx !== i) } : f))
   }
 
   function setSourceField(provider: string, field: 'token' | 'base_url', value: string) {
-    setForm((f) =>
+    setForm(f =>
       f
         ? {
             ...f,
@@ -132,47 +161,43 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-8 max-w-3xl space-y-6">
       <PageHeader
         eyebrow="Configuration"
         title="Settings"
-        description="Tell narratorlog where to read from, how to write, and where to deliver."
+        description="Connect git, choose your AI writer, and set up delivery."
       />
 
-      <div className="mt-8 grid lg:grid-cols-[170px_minmax(0,1fr)] gap-10 max-w-4xl">
-        <nav className="hidden lg:block">
-          <ul className="sticky top-8 space-y-0.5">
-            {SECTIONS.map((s) => (
-              <li key={s.id}>
-                <a
-                  href={`#${s.id}`}
-                  className="block rounded-md px-3 py-1.5 font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
-                >
-                  {s.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
+      <Tabs value={tab} onValueChange={selectTab} className="gap-6">
+        <TabsList variant="line" className="w-full justify-start border-b border-border/70 pb-px">
+          {TABS.map(t => (
+            <TabsTrigger
+              key={t.id}
+              value={t.id}
+              className="font-mono text-[0.6875rem] font-bold uppercase tracking-[0.14em] px-3 pb-2.5"
+            >
+              {t.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-        <div className="space-y-6 min-w-0">
+        <TabsContent value="ai" className="mt-0">
           <Section
-            id="ai"
             eyebrow="Generation"
-            title="AI provider"
-            description="The model that turns commits into prose."
+            title="AI writer"
+            description="The model that turns commits into drafts."
           >
             <div className="space-y-2">
               <Label>Provider</Label>
               <Select
                 value={form.ai.provider}
-                onValueChange={(v) => setForm({ ...form, ai: { ...form.ai, provider: v } })}
+                onValueChange={v => setForm({ ...form, ai: { ...form.ai, provider: v } })}
               >
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Select provider…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {AI_PROVIDERS.map((p) => (
+                  {AI_PROVIDERS.map(p => (
                     <SelectItem key={p} value={p}>
                       {p}
                     </SelectItem>
@@ -184,9 +209,9 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <Label>Model</Label>
               <Input
-                placeholder="e.g. claude-3-5-sonnet-20241022"
+                placeholder="e.g. gpt-4o"
                 value={form.ai.model}
-                onChange={(e) => setForm({ ...form, ai: { ...form.ai, model: e.target.value } })}
+                onChange={e => setForm({ ...form, ai: { ...form.ai, model: e.target.value } })}
               />
             </div>
 
@@ -195,7 +220,7 @@ export default function SettingsPage() {
                 guideId={form.ai.provider as KeyGuideId}
                 value={form.ai.api_key}
                 saved={data?.ai.api_key_set}
-                onChange={(v) => setForm({ ...form, ai: { ...form.ai, api_key: v } })}
+                onChange={v => setForm({ ...form, ai: { ...form.ai, api_key: v } })}
               />
             ) : (
               <div className="space-y-2">
@@ -203,10 +228,10 @@ export default function SettingsPage() {
                 <Input
                   type="password"
                   placeholder={
-                    data?.ai.api_key_set ? '•••••••• (saved — leave blank to keep)' : 'Optional for local models'
+                    data?.ai.api_key_set ? 'Saved — leave blank to keep' : 'Optional for local models'
                   }
                   value={form.ai.api_key}
-                  onChange={(e) => setForm({ ...form, ai: { ...form.ai, api_key: e.target.value } })}
+                  onChange={e => setForm({ ...form, ai: { ...form.ai, api_key: e.target.value } })}
                 />
               </div>
             )}
@@ -216,7 +241,7 @@ export default function SettingsPage() {
               <Input
                 placeholder="Optional — for Ollama or compatible endpoints"
                 value={form.ai.base_url}
-                onChange={(e) => setForm({ ...form, ai: { ...form.ai, base_url: e.target.value } })}
+                onChange={e => setForm({ ...form, ai: { ...form.ai, base_url: e.target.value } })}
               />
             </div>
 
@@ -224,56 +249,54 @@ export default function SettingsPage() {
               <Label>Depth</Label>
               <Select
                 value={form.ai.depth || 'standard'}
-                onValueChange={(v) => setForm({ ...form, ai: { ...form.ai, depth: v } })}
+                onValueChange={v => setForm({ ...form, ai: { ...form.ai, depth: v } })}
               >
                 <SelectTrigger className="w-36">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="standard">standard</SelectItem>
-                  <SelectItem value="deep">deep</SelectItem>
+                  <SelectItem value="standard">Standard</SelectItem>
+                  <SelectItem value="deep">Deep</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </Section>
+        </TabsContent>
 
+        <TabsContent value="delivery" className="mt-0">
           <Section
-            id="delivery"
             eyebrow="Channels"
             title="Delivery"
-            description="Where approved changelogs are published, and who reads each one."
+            description="Where approved stories go after you sign off."
           >
             <div className="space-y-4">
               <p className="eyebrow">Credentials</p>
-              {OUTPUT_PLUGINS.map((plugin) => (
+              {OUTPUT_PLUGINS.map(plugin => (
                 <KeyField
                   key={plugin}
                   guideId={plugin as KeyGuideId}
                   value={form.integrations?.[plugin]?.[INTEGRATION_SECRET[plugin]] ?? ''}
                   saved={Boolean(data?.integrations?.[plugin]?.[INTEGRATION_SECRET[plugin]])}
-                  onChange={(v) => setIntegrationSecret(plugin, v)}
+                  onChange={v => setIntegrationSecret(plugin, v)}
                 />
               ))}
             </div>
 
-            <div className="space-y-3 border-t pt-5">
-              <p className="eyebrow">Routing</p>
+            <div className="space-y-3 border-t border-border/70 pt-5">
+              <p className="eyebrow">Routes</p>
               {form.routing.length === 0 && (
                 <p className="text-muted-foreground text-sm">
-                  No routes yet. Add one to send an audience’s draft to a channel.
+                  No routes yet. Add one to send a draft to Slack, email, or another channel.
                 </p>
               )}
               {form.routing.map((r, i) => (
                 <div key={i} className="flex items-center gap-2 flex-wrap">
-                  <Select
-                    value={r.audience}
-                    onValueChange={(v) => updateRouting(i, { audience: v })}
-                  >
+                  <Select value={r.audience} onValueChange={v => updateRouting(i, { audience: v })}>
                     <SelectTrigger className="w-36">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {AUDIENCES.map((a) => (
+                      {AUDIENCES.map(a => (
                         <SelectItem key={a} value={a}>
                           {a}
                         </SelectItem>
@@ -283,15 +306,12 @@ export default function SettingsPage() {
 
                   <span className="font-mono text-muted-foreground text-sm">→</span>
 
-                  <Select
-                    value={r.plugin}
-                    onValueChange={(v) => updateRouting(i, { plugin: v })}
-                  >
+                  <Select value={r.plugin} onValueChange={v => updateRouting(i, { plugin: v })}>
                     <SelectTrigger className="w-32">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {OUTPUT_PLUGINS.map((p) => (
+                      {OUTPUT_PLUGINS.map(p => (
                         <SelectItem key={p} value={p}>
                           {p}
                         </SelectItem>
@@ -301,13 +321,13 @@ export default function SettingsPage() {
 
                   <Input
                     className="flex-1 min-w-40 font-mono text-xs"
-                    placeholder='{"channel":"#marketing"}'
+                    placeholder='{"channel":"#updates"}'
                     defaultValue={JSON.stringify(r.config ?? {})}
-                    onBlur={(e) => {
+                    onBlur={e => {
                       try {
                         updateRouting(i, { config: JSON.parse(e.target.value || '{}') })
                       } catch {
-                        toast.error('Destination must be valid JSON.')
+                        toast.error('Route options must be valid JSON.')
                       }
                     }}
                   />
@@ -319,6 +339,7 @@ export default function SettingsPage() {
               ))}
 
               <button
+                type="button"
                 className="font-mono text-xs uppercase tracking-[0.1em] text-primary hover:underline"
                 onClick={addRouting}
               >
@@ -326,21 +347,22 @@ export default function SettingsPage() {
               </button>
             </div>
           </Section>
+        </TabsContent>
 
+        <TabsContent value="sources" className="mt-0">
           <Section
-            id="sources"
             eyebrow="Repositories"
-            title="Git sources"
-            description="Personal access tokens, encrypted at rest. Leave blank to keep an existing token."
+            title="Git access"
+            description="Tokens are encrypted at rest. Leave blank to keep an existing token."
           >
-            {(['github', 'gitlab', 'bitbucket'] as const).map((p) => {
+            {(['github', 'gitlab', 'bitbucket'] as const).map(p => {
               const connected = data?.sources?.[p]?.token_set
               return (
-                <div key={p} className="space-y-3 border-t pt-5 first:border-t-0 first:pt-0">
+                <div key={p} className="space-y-3 border-t border-border/70 pt-5 first:border-t-0 first:pt-0">
                   <div className="flex items-center gap-2">
                     <h3 className="font-mono text-sm font-bold capitalize">{p}</h3>
                     {connected && (
-                      <span className="inline-flex items-center gap-1 font-mono text-[0.65rem] font-bold uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-400">
+                      <span className="inline-flex items-center gap-1 font-mono text-[0.65rem] font-bold uppercase tracking-[0.12em] text-emerald-700">
                         <span className="size-1.5 rounded-full bg-current" />
                         Connected
                       </span>
@@ -352,7 +374,7 @@ export default function SettingsPage() {
                       label="Personal access token"
                       value={form.sources?.[p]?.token ?? ''}
                       saved={connected}
-                      onChange={(v) => setSourceField(p, 'token', v)}
+                      onChange={v => setSourceField(p, 'token', v)}
                     />
                     {(p === 'github' || p === 'gitlab') && (
                       <div className="space-y-1.5">
@@ -364,7 +386,7 @@ export default function SettingsPage() {
                               : 'https://gitlab.example.com — self-hosted GitLab'
                           }
                           value={form.sources?.[p]?.base_url ?? ''}
-                          onChange={(e) => setSourceField(p, 'base_url', e.target.value)}
+                          onChange={e => setSourceField(p, 'base_url', e.target.value)}
                         />
                       </div>
                     )}
@@ -373,25 +395,26 @@ export default function SettingsPage() {
               )
             })}
           </Section>
+        </TabsContent>
 
+        <TabsContent value="privacy" className="mt-0">
           <Section
-            id="privacy"
             eyebrow="Safeguards"
             title="Privacy"
-            description="What leaves your infrastructure when a scan runs."
+            description="Control what leaves your infrastructure when a story runs."
           >
             <label className="flex items-start gap-3 text-sm cursor-pointer">
               <input
                 type="checkbox"
                 className="mt-0.5 size-4 accent-primary"
                 checked={form.privacy.scrub_secrets}
-                onChange={(e) =>
+                onChange={e =>
                   setForm({ ...form, privacy: { ...form.privacy, scrub_secrets: e.target.checked } })
                 }
               />
               <span>
                 Scrub secrets from diffs
-                <span className="block text-muted-foreground text-xs">
+                <span className="block text-muted-foreground text-xs mt-0.5">
                   Redact tokens and keys before any diff is read.
                 </span>
               </span>
@@ -401,25 +424,25 @@ export default function SettingsPage() {
                 type="checkbox"
                 className="mt-0.5 size-4 accent-primary"
                 checked={form.privacy.local_only}
-                onChange={(e) =>
+                onChange={e =>
                   setForm({ ...form, privacy: { ...form.privacy, local_only: e.target.checked } })
                 }
               />
               <span>
-                Local-only
-                <span className="block text-muted-foreground text-xs">
+                Local-only mode
+                <span className="block text-muted-foreground text-xs mt-0.5">
                   Never send code context to an external AI provider.
                 </span>
               </span>
             </label>
           </Section>
+        </TabsContent>
+      </Tabs>
 
-          <div className="sticky bottom-0 -mx-1 flex justify-end border-t bg-background/80 px-1 py-4 backdrop-blur">
-            <Button disabled={save.isPending} onClick={() => save.mutate(form)}>
-              {save.isPending ? 'Saving…' : 'Save settings'}
-            </Button>
-          </div>
-        </div>
+      <div className="sticky bottom-0 flex justify-end border-t border-border/70 bg-background/90 py-4 backdrop-blur-sm">
+        <Button disabled={save.isPending} onClick={() => save.mutate(form)}>
+          {save.isPending ? 'Saving…' : 'Save settings'}
+        </Button>
       </div>
     </div>
   )

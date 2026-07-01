@@ -48,6 +48,7 @@ func RegisterRoutes(r *gin.Engine, h *handlers.Handler, sessions *auth.SessionMa
 		api.GET("/scans/:id/commits", h.ListScanCommits)
 		api.GET("/scans/:id/groups", h.ListScanGroups)
 		api.GET("/scans/:id/drafts", h.ListScanDrafts)
+		api.GET("/scans/:id/deliveries", h.ListScanDeliveries)
 		api.POST("/scans/:id/deliver", h.DeliverScan)
 		api.DELETE("/scans/:id", h.CancelScan)
 

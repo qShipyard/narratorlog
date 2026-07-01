@@ -52,7 +52,7 @@ export default function SetupPage() {
         password,
       })
       toast.success('Setup complete. Welcome to narratorlog.')
-      router.push('/dashboard')
+      router.push('/activate')
     } catch {
       toast.error('Setup failed. Please try again.')
     } finally {

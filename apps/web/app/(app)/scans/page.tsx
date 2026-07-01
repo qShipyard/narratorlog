@@ -8,8 +8,11 @@ import { ScanCard } from '@/components/scan-card'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/page-header'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { LedgerList, LedgerPanel } from '@/components/ledger-list'
 import { RevealGroup, RevealItem } from '@/components/reveal'
 import { useScanTrigger } from '@/lib/hooks/use-scan-trigger'
+import { useReadiness } from '@/lib/hooks/use-readiness'
+import { copy } from '@/lib/copy'
 import { toast } from 'sonner'
 
 function ScansContent() {
@@ -31,6 +34,7 @@ function ScansContent() {
 
   const scans = scansData?.data ?? []
   const repos = reposData?.data ?? []
+  const { readiness } = useReadiness(scans)
 
   function setRepoFilter(value: string) {
     const params = new URLSearchParams(searchParams)
@@ -40,9 +44,21 @@ function ScansContent() {
     router.replace(query ? `/scans?${query}` : '/scans')
   }
 
-  function handleTriggerScan() {
+  function handleTriggerStory() {
     if (repoFilter === 'all') {
-      toast.error('Select a repository to run a scan.')
+      toast.error(copy.selectRepoToRun)
+      return
+    }
+    if (!readiness.canRunStory) {
+      const blocker = readiness.runStoryBlocker
+      toast.error(
+        blocker ? `${blocker.label} isn't set up yet.` : "Story can't run until setup is complete.",
+        {
+          action: blocker?.fixHref
+            ? { label: blocker.fixLabel ?? 'Fix', onClick: () => router.push(blocker.fixHref!) }
+            : undefined,
+        },
+      )
       return
     }
     trigger.mutate({ repository_id: repoFilter })
@@ -52,11 +68,11 @@ function ScansContent() {
     <div className="p-8 space-y-6 max-w-5xl">
       <PageHeader
         eyebrow="Pipeline"
-        title="Scans"
-        description="Every pipeline run, newest first."
+        title={copy.stories}
+        description="Every story run, newest first."
         action={
-          <Button onClick={handleTriggerScan} disabled={trigger.isPending}>
-            {trigger.isPending ? 'Queuing…' : 'Run scan'}
+          <Button onClick={handleTriggerStory} disabled={trigger.isPending}>
+            {trigger.isPending ? 'Queuing…' : copy.runStory}
           </Button>
         }
       />
@@ -74,18 +90,18 @@ function ScansContent() {
       </Select>
 
       {scans.length === 0 ? (
-        <div className="rounded-xl border bg-card py-14 text-center">
-          <p className="text-muted-foreground text-sm">
-            No scans yet. Run one to read back what shipped.
-          </p>
-        </div>
+        <LedgerPanel className="py-14 text-center">
+          <p className="text-muted-foreground text-sm">{copy.noStoriesRun}</p>
+        </LedgerPanel>
       ) : (
-        <RevealGroup className="rail">
-          {scans.map(scan => (
-            <RevealItem key={scan.id}>
-              <ScanCard scan={scan} highlight={scan.status === 'awaiting_approval'} />
-            </RevealItem>
-          ))}
+        <RevealGroup>
+          <LedgerList>
+            {scans.map(scan => (
+              <RevealItem key={scan.id}>
+                <ScanCard scan={scan} highlight={scan.status === 'awaiting_approval'} />
+              </RevealItem>
+            ))}
+          </LedgerList>
         </RevealGroup>
       )}
     </div>

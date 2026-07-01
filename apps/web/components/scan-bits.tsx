@@ -2,26 +2,15 @@ import { ScanStatus, CommitGroup } from '@/lib/api'
 import { isLiveStatus } from '@/components/pipeline-timeline'
 import { SignalMark } from '@/components/signal-mark'
 import { cn } from '@/lib/utils'
+import { getStoryStatusLabel, STATUS_LINE_TONE_CLASS, getStoryStatus } from '@/lib/status-labels'
 
 export function StatusLine({ status }: { status: ScanStatus }) {
   const live = isLiveStatus(status)
-  const map: Partial<Record<ScanStatus, string>> = {
-    awaiting_approval: 'Awaiting review',
-    approved: 'Approved',
-    delivering: 'Delivering',
-    delivered: 'Delivered',
-    summarizing: 'Narrating',
-    reading_context: 'Reading context',
-  }
-  const label = map[status] ?? status.replace(/_/g, ' ')
-  const tone =
-    status === 'awaiting_approval' ? 'text-signal'
-    : status === 'delivered' ? 'text-emerald-400'
-    : live ? 'text-primary'
-    : 'text-muted-foreground'
+  const { tone } = getStoryStatus(status)
+  const label = getStoryStatusLabel(status)
 
   return (
-    <span className={cn('inline-flex items-center gap-1.5', tone)}>
+    <span className={cn('inline-flex items-center gap-1.5', STATUS_LINE_TONE_CLASS[tone])}>
       {live && <SignalMark state="live" />}
       {label}
     </span>

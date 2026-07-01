@@ -9,6 +9,8 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+import { copy } from '@/lib/copy'
+
 export const COMMAND_PALETTE_EVENT = 'narratorlog:command-palette'
 
 export function openCommandPalette() {
@@ -27,12 +29,12 @@ type Command = {
 
 const COMMANDS: Command[] = [
   { id: 'dashboard', label: 'Dashboard', group: 'Go to', icon: LayoutDashboard, perform: r => r.push('/dashboard') },
-  { id: 'scans', label: 'Scans', group: 'Go to', icon: ScanLine, perform: r => r.push('/scans') },
+  { id: 'scans', label: copy.stories, group: 'Go to', icon: ScanLine, perform: r => r.push('/scans') },
   { id: 'repositories', label: 'Repositories', group: 'Go to', icon: GitBranch, perform: r => r.push('/repositories') },
   { id: 'team', label: 'Team', group: 'Go to', icon: Users, perform: r => r.push('/team') },
   { id: 'settings', label: 'Settings', group: 'Go to', icon: Settings, perform: r => r.push('/settings') },
   { id: 'connect', label: 'Connect a repository', group: 'Actions', icon: Plus, perform: r => r.push('/repositories') },
-  { id: 'run-scan', label: 'Run a scan', group: 'Actions', icon: ScanLine, perform: r => r.push('/scans') },
+  { id: 'run-scan', label: copy.runStory, group: 'Actions', icon: ScanLine, perform: r => r.push('/scans') },
   { id: 'ai-key', label: 'Add an AI key', group: 'Actions', icon: KeyRound, perform: r => r.push('/settings#ai') },
 ]
 
