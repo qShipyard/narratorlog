@@ -28,9 +28,7 @@ type Output struct {
 type Source struct {
 	TokenEncrypted string `json:"token_encrypted,omitempty"`
 	BaseURL        string `json:"base_url,omitempty"`
-	// Login is the handle that owns the token, resolved from the provider when the
-	// token is saved. Personal scans are scoped to this identity's PRs. Not secret.
-	Login string `json:"login,omitempty"`
+	Login          string `json:"login,omitempty"`
 }
 
 type Config struct {

@@ -83,7 +83,7 @@ func (p *DueCheckProcessor) enqueueScan(ctx context.Context, repo db.Repository)
 	if err != nil {
 		return err
 	}
-	_, err = p.client.Enqueue(asynq.NewTask(JobScan, payload))
+	_, err = p.client.Enqueue(asynq.NewTask(JobScan, payload), asynq.MaxRetry(3))
 	return err
 }
 

@@ -7,6 +7,26 @@ import {
   runSourcePlugin,
 } from '@narratorlog/sdk'
 
+const FETCH_CONCURRENCY = 8
+
+type PRDetail = Awaited<ReturnType<Octokit['pulls']['get']>>['data']
+type PRCommit = Awaited<ReturnType<Octokit['pulls']['listCommits']>>['data'][number]
+
+// mapLimit runs fn over items with at most `limit` in flight, preserving order.
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (true) {
+      const i = next++
+      if (i >= items.length) return
+      results[i] = await fn(items[i])
+    }
+  })
+  await Promise.all(workers)
+  return results
+}
+
 class GitHubSourcePlugin implements SourcePlugin {
   async fetch(request: SourceRequest): Promise<SourceResponse> {
     const octokit = new Octokit({
@@ -45,37 +65,48 @@ class GitHubSourcePlugin implements SourcePlugin {
 
     const search = await octokit.search.issuesAndPullRequests({ q, per_page: 100 })
 
-    const commits: RawCommit[] = []
+    // Pull each PR's detail + commit list concurrently. Sequential per-PR and
+    // per-commit round-trips blow past the source-plugin timeout on active repos.
+    const perPR = await mapLimit(search.data.items, FETCH_CONCURRENCY, async item => {
+      const [pr, prCommits] = await Promise.all([
+        octokit.pulls.get({ owner, repo, pull_number: item.number }),
+        octokit.paginate(octokit.pulls.listCommits, {
+          owner,
+          repo,
+          pull_number: item.number,
+          per_page: 100,
+        }),
+      ])
+      return { pr: pr.data, prCommits }
+    })
+
+    // Dedup by sha synchronously — a commit can belong to more than one PR — so
+    // the concurrent file-attach step below never races on the seen set.
     const seen = new Set<string>()
-
-    for (const item of search.data.items) {
-      const pr = await octokit.pulls.get({ owner, repo, pull_number: item.number })
-      const prCommits = await octokit.paginate(octokit.pulls.listCommits, {
-        owner,
-        repo,
-        pull_number: item.number,
-        per_page: 100,
-      })
-
+    const pending: { raw: PRCommit; pr: PRDetail }[] = []
+    for (const { pr, prCommits } of perPR) {
       for (const c of prCommits) {
-        if (seen.has(c.sha)) continue // a commit can appear in more than one PR
+        if (seen.has(c.sha)) continue
         seen.add(c.sha)
-
-        const commit = this.baseCommit(c.sha, c.commit)
-        if (!commit) continue
-
-        commit.pr_number = pr.data.number
-        commit.pr_title = pr.data.title
-        commit.pr_description = pr.data.body ?? undefined
-        commit.pr_author_login = pr.data.user?.login ?? undefined
-        commit.pr_base_branch = pr.data.base.ref
-
-        await this.attachFiles(octokit, owner, repo, c.sha, commit, request)
-        commits.push(commit)
+        pending.push({ raw: c, pr })
       }
     }
 
-    return commits
+    const built = await mapLimit(pending, FETCH_CONCURRENCY, async ({ raw, pr }) => {
+      const commit = this.baseCommit(raw.sha, raw.commit)
+      if (!commit) return null
+
+      commit.pr_number = pr.number
+      commit.pr_title = pr.title
+      commit.pr_description = pr.body ?? undefined
+      commit.pr_author_login = pr.user?.login ?? undefined
+      commit.pr_base_branch = pr.base.ref
+
+      await this.attachFiles(octokit, owner, repo, raw.sha, commit, request)
+      return commit
+    })
+
+    return built.filter((c): c is RawCommit => c !== null)
   }
 
   // ── Branch-centric fallback (whole-repo activity on a branch) ──

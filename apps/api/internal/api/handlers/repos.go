@@ -349,8 +349,19 @@ func repoToJSON(r db.Repository) gin.H {
 		"default_branch":  r.DefaultBranch,
 		"is_active":       r.IsActive,
 		"last_scanned_at": r.LastScannedAt,
-		"config":          r.Config,
+		"config":          repoConfigJSON(r.Config),
 	}
+}
+
+// repoConfigJSON turns the raw config bytes into a real JSON object for the API
+// response. Marshalling the []byte directly would base64-encode it, so the web
+// could never read config.cadence / config.base_branches back.
+func repoConfigJSON(raw []byte) map[string]any {
+	cfg := map[string]any{}
+	if len(raw) > 0 {
+		_ = json.Unmarshal(raw, &cfg)
+	}
+	return cfg
 }
 
 func marshalJSON(v any) ([]byte, error) {

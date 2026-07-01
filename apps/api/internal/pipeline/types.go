@@ -159,8 +159,6 @@ type SourcePluginRequest struct {
 	AccessToken string `json:"access_token"`
 	Depth       string `json:"depth"`
 	BaseURL     string `json:"base_url,omitempty"`
-	// AuthorLogin, when set, scopes the fetch to PRs this handle authored (any
-	// base branch). Empty falls back to branch-centric commit listing.
 	AuthorLogin string `json:"author_login,omitempty"`
 }
 

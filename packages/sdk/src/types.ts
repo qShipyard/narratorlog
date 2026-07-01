@@ -16,7 +16,6 @@ export interface SourceRequest {
   access_token: string
   depth: AIDepth
   base_url?: string
-  /** When set, scope the fetch to PRs this handle authored (any base branch). */
   author_login?: string
 }
 

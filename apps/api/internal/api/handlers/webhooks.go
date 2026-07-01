@@ -101,7 +101,7 @@ func (h *Handler) enqueueWebhookScan(ctx context.Context, repo db.Repository) {
 		TriggerType:  "webhook",
 		Lookback:     "7d",
 	})
-	h.asynq.Enqueue(asynq.NewTask(jobs.JobScan, payload))
+	h.asynq.Enqueue(asynq.NewTask(jobs.JobScan, payload), asynq.MaxRetry(3))
 }
 
 func (h *Handler) GitLabWebhook(c *gin.Context) {
