@@ -157,6 +157,11 @@ func (h *Handler) UpdateRepo(c *gin.Context) {
 		return
 	}
 
+	if err := validateRepoConfig(req.Config); err != nil {
+		errorResponse(c, http.StatusBadRequest, "INVALID_CONFIG", err.Error())
+		return
+	}
+
 	configJSON, err := marshalJSON(req.Config)
 	if err != nil {
 		errorResponse(c, http.StatusBadRequest, "INVALID_CONFIG", "Invalid config.")
@@ -255,6 +260,85 @@ func (h *Handler) ListAvailableRepos(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": data})
 }
 
+func (h *Handler) ListRepoBranches(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		errorResponse(c, http.StatusBadRequest, "INVALID_ID", "Invalid repository ID.")
+		return
+	}
+
+	repo, err := h.queries.GetRepositoryByID(c.Request.Context(), id)
+	if err != nil {
+		errorResponse(c, http.StatusNotFound, "NOT_FOUND", "Repository not found.")
+		return
+	}
+
+	raw, err := h.queries.GetTeamConfig(c.Request.Context(), repo.TeamID)
+	if err != nil {
+		errorResponse(c, http.StatusNotFound, "NOT_FOUND", "Team not found.")
+		return
+	}
+	cfg, err := teamconfig.Parse(raw)
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to parse config.")
+		return
+	}
+
+	provider := string(repo.Provider)
+	token, baseURL, ok, err := cfg.DecryptedSource(provider, h.encryptor)
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to decrypt source token.")
+		return
+	}
+	if !ok {
+		errorResponse(c, http.StatusConflict, "SOURCE_NOT_CONNECTED", "No token configured for this provider. Go to Settings → Sources.")
+		return
+	}
+
+	client, ok := sources.For(provider)
+	if !ok {
+		errorResponse(c, http.StatusBadRequest, "UNKNOWN_PROVIDER", "Unknown git provider.")
+		return
+	}
+
+	parts := splitFullName(repo.FullName)
+	if len(parts) != 2 {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Malformed repository name.")
+		return
+	}
+
+	branches, err := client.ListBranches(c.Request.Context(), token, baseURL, parts[0], parts[1])
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SOURCE_ERROR", "Failed to fetch branches from provider.")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": branches})
+}
+
+var allowedCadence = map[string]bool{"manual": true, "daily": true, "weekly": true, "monthly": true}
+
+func validateRepoConfig(cfg map[string]any) error {
+	if cad, ok := cfg["cadence"]; ok {
+		s, isStr := cad.(string)
+		if !isStr || !allowedCadence[s] {
+			return fmt.Errorf("invalid cadence: must be one of manual, daily, weekly, monthly")
+		}
+	}
+	if bb, ok := cfg["base_branches"]; ok {
+		arr, isArr := bb.([]any)
+		if !isArr {
+			return fmt.Errorf("base_branches must be an array of strings")
+		}
+		for _, v := range arr {
+			if _, isStr := v.(string); !isStr {
+				return fmt.Errorf("base_branches must contain only strings")
+			}
+		}
+	}
+	return nil
+}
+
 func repoToJSON(r db.Repository) gin.H {
 	return gin.H{
 		"id":              r.ID,
@@ -265,8 +349,19 @@ func repoToJSON(r db.Repository) gin.H {
 		"default_branch":  r.DefaultBranch,
 		"is_active":       r.IsActive,
 		"last_scanned_at": r.LastScannedAt,
-		"config":          r.Config,
+		"config":          repoConfigJSON(r.Config),
 	}
+}
+
+// repoConfigJSON turns the raw config bytes into a real JSON object for the API
+// response. Marshalling the []byte directly would base64-encode it, so the web
+// could never read config.cadence / config.base_branches back.
+func repoConfigJSON(raw []byte) map[string]any {
+	cfg := map[string]any{}
+	if len(raw) > 0 {
+		_ = json.Unmarshal(raw, &cfg)
+	}
+	return cfg
 }
 
 func marshalJSON(v any) ([]byte, error) {

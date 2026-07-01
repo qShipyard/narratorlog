@@ -1,4 +1,5 @@
 import axios from 'axios'
+import type { RepoCadence } from './repo-schedule'
 
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080',
@@ -44,6 +45,11 @@ export interface User {
   }
 }
 
+export type RepoConfig = {
+  cadence?: RepoCadence
+  base_branches?: string[]
+}
+
 export interface Repository {
   id: string
   name: string
@@ -53,7 +59,7 @@ export interface Repository {
   default_branch: string
   is_active: boolean
   last_scanned_at?: string
-  config: Record<string, unknown>
+  config: RepoConfig
 }
 
 export interface Scan {
@@ -278,7 +284,8 @@ export const reposApi = {
     default_branch: string
   }) => api.post<Repository>('/api/v1/repos', data),
   get: (id: string) => api.get<Repository>(`/api/v1/repos/${id}`),
-  update: (id: string, config: Record<string, unknown>) =>
+  branches: (id: string) => api.get<{ data: string[] }>(`/api/v1/repos/${id}/branches`),
+  update: (id: string, config: RepoConfig) =>
     api.patch<Repository>(`/api/v1/repos/${id}`, { config }),
   disconnect: (id: string) => api.delete(`/api/v1/repos/${id}`),
 }

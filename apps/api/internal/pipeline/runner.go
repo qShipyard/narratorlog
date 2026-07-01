@@ -80,16 +80,37 @@ func (r *Runner) stageScan(ctx context.Context, scanID string) error {
 		AccessToken: r.Config.AccessToken,
 		Depth:       string(r.Config.AIDepth),
 		BaseURL:     r.Config.SourceBaseURL,
+		AuthorLogin: r.Config.AuthorLogin,
 	})
 	if err != nil {
 		return err
 	}
 
-	commits := make([]Commit, len(resp.Commits))
-	for i, raw := range resp.Commits {
+	kept := keepByBaseBranch(resp.Commits, r.Config.BaseBranches)
+	commits := make([]Commit, len(kept))
+	for i, raw := range kept {
 		commits[i] = toCommit(raw, scanID)
 	}
 	return r.Store.SaveCommits(ctx, commits)
+}
+
+func keepByBaseBranch(commits []SourcePluginCommit, bases []string) []SourcePluginCommit {
+	if len(bases) == 0 {
+		return commits
+	}
+	set := make(map[string]bool, len(bases))
+	for _, b := range bases {
+		set[b] = true
+	}
+	out := make([]SourcePluginCommit, 0, len(commits))
+	for _, c := range commits {
+		// A commit with no PR base branch (branch-centric/direct) is never filtered.
+		if c.PRBaseBranch != nil && !set[*c.PRBaseBranch] {
+			continue
+		}
+		out = append(out, c)
+	}
+	return out
 }
 
 // stageFilter marks noise without deleting — filtered commits stay in the DB

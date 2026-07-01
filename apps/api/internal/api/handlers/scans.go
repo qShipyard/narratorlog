@@ -162,7 +162,7 @@ func (h *Handler) TriggerScan(c *gin.Context) {
 	})
 
 	task := asynq.NewTask(jobs.JobScan, payload)
-	if _, err := h.asynq.Enqueue(task); err != nil {
+	if _, err := h.asynq.Enqueue(task, asynq.MaxRetry(3)); err != nil {
 		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to queue scan.")
 		return
 	}

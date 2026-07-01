@@ -53,21 +53,26 @@ func main() {
 		}),
 	})
 
+	asynqClient := asynq.NewClient(redisOpt)
+	defer asynqClient.Close()
+
 	scanProcessor := jobs.NewScanProcessor(pool, enc)
 	deliveryProcessor := jobs.NewDeliveryProcessor(pool, enc)
+	dueCheckProcessor := jobs.NewDueCheckProcessor(pool, asynqClient)
 
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(jobs.JobScan, scanProcessor.ProcessTask)
 	mux.HandleFunc(jobs.JobDeliver, deliveryProcessor.ProcessTask)
 	mux.HandleFunc(jobs.JobScheduled, scanProcessor.ProcessTask)
+	mux.HandleFunc(jobs.JobDueCheck, dueCheckProcessor.ProcessTask)
 
-	scheduler, err := worker.NewScheduler(cfg.RedisURL, pool)
+	scheduler, err := worker.NewScheduler(cfg.RedisURL)
 	if err != nil {
 		log.Fatalf("failed to create scheduler: %v", err)
 	}
 
-	if err := scheduler.RegisterWeeklyScans(context.Background()); err != nil {
-		log.Printf("[worker] warning: failed to register weekly scans: %v", err)
+	if err := scheduler.RegisterDueScanner(); err != nil {
+		log.Printf("[worker] warning: failed to register due-scanner: %v", err)
 	}
 
 	if err := scheduler.Start(); err != nil {

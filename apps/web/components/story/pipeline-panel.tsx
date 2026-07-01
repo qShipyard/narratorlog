@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ScanStatus } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { PipelineTimeline, isLiveStatus } from '@/components/pipeline-timeline'
+import { SignalMark } from '@/components/signal-mark'
 import { getStoryStatusLabel, COLLAPSED_LIVE_LABEL } from '@/lib/status-labels'
 import { cn } from '@/lib/utils'
 
@@ -42,6 +43,7 @@ export function PipelinePanel({ status }: { status: ScanStatus }) {
     status === 'failed' || status === 'cancelled',
   )
   const failed = status === 'failed' || status === 'cancelled'
+  const live = isLiveStatus(status)
   const percent = progressPercent(status)
 
   if (!expanded) {
@@ -49,13 +51,16 @@ export function PipelinePanel({ status }: { status: ScanStatus }) {
       <div className="rounded-xl border bg-card/60 px-5 py-4">
         <div className="flex items-center gap-4">
           <div className="flex-1 min-w-0 space-y-2">
-            <p className="text-sm font-medium">{collapsedLabel(status)}</p>
-            <div className="h-1 rounded-full bg-rail overflow-hidden">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              {live && <SignalMark state="live" />}
+              {collapsedLabel(status)}
+            </p>
+            <div className={cn('relative h-1 rounded-full bg-rail overflow-hidden', live && 'progress-live')}>
               <div
                 className={cn(
                   'h-full rounded-full transition-all duration-500',
                   failed ? 'bg-destructive' : 'bg-primary',
-                  isLiveStatus(status) && 'bg-signal',
+                  live && 'bg-signal',
                 )}
                 style={{ width: `${percent}%` }}
               />

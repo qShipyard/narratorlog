@@ -50,7 +50,6 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByProvider(ctx context.Context, arg GetUserByProviderParams) (User, error)
 	IsSetupComplete(ctx context.Context) (bool, error)
-	ListActiveWeeklyRepos(ctx context.Context) ([]Repository, error)
 	ListAllCommitsByScan(ctx context.Context, scanID uuid.UUID) ([]Commit, error)
 	ListAuditLogByEntity(ctx context.Context, arg ListAuditLogByEntityParams) ([]AuditLog, error)
 	ListAuditLogByTeam(ctx context.Context, arg ListAuditLogByTeamParams) ([]AuditLog, error)
@@ -60,6 +59,9 @@ type Querier interface {
 	ListDeliveriesByDraft(ctx context.Context, draftID uuid.UUID) ([]Delivery, error)
 	ListDeliveriesByScan(ctx context.Context, scanID uuid.UUID) ([]ListDeliveriesByScanRow, error)
 	ListDraftsByScan(ctx context.Context, scanID uuid.UUID) ([]AudienceDraft, error)
+	// Active repos whose cadence says they're due for another scan, based on when
+	// they last ran. Drives the automated due-scanner tick.
+	ListDueRepos(ctx context.Context) ([]Repository, error)
 	ListRepositoriesByTeam(ctx context.Context, teamID uuid.UUID) ([]Repository, error)
 	ListScansByRepository(ctx context.Context, arg ListScansByRepositoryParams) ([]Scan, error)
 	ListScansByTeam(ctx context.Context, arg ListScansByTeamParams) ([]Scan, error)
