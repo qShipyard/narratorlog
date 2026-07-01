@@ -1,9 +1,11 @@
 # narratorlog — Self-Host Setup
 
 > **Just want to try it locally?** Skip this entire guide and run one command from
-> the repo root: `docker compose -f deploy/docker-compose.quickstart.yml up --build`,
-> then open http://localhost:3000. The steps below are for a real production
-> deployment behind nginx with TLS.
+> the repo root: `docker compose -f deploy/docker-compose.quickstart.yml up -d --build`,
+> then open http://localhost:3000. To reset and try first-run setup again:
+> `docker compose -f deploy/docker-compose.quickstart.yml down -v` then
+> `up -d --build` again. The steps below are for a real production deployment
+> behind nginx with TLS.
 
 ## Prerequisites
 

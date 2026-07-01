@@ -25,23 +25,39 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (setupStatus && !setupStatus.setup_complete) {
-      router.push('/setup')
+      router.replace('/setup')
     }
   }, [setupStatus, router])
 
   useEffect(() => {
-    if (isError) router.push('/login')
-  }, [isError, router])
+    if (setupStatus?.setup_complete && isError) {
+      router.replace('/login')
+    }
+  }, [setupStatus, isError, router])
 
-  if (isLoading || !setupStatus) {
+  if (!setupStatus) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-muted-foreground text-sm">Loading...</div>
+        <div className="text-muted-foreground text-sm">Loading…</div>
       </div>
     )
   }
 
-  if (!user) return null
+  if (!setupStatus.setup_complete) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-muted-foreground text-sm">Opening setup…</div>
+      </div>
+    )
+  }
+
+  if (isLoading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-muted-foreground text-sm">Loading…</div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-dvh overflow-hidden">

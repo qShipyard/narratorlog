@@ -8,11 +8,22 @@ export const api = axios.create({
   },
 })
 
+const PUBLIC_ROUTES = ['/setup', '/login', '/activate']
+
+function isPublicRoute(pathname: string): boolean {
+  return PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith(`${route}/`))
+}
+
 api.interceptors.response.use(
   res => res,
   err => {
-    if (err.response?.status === 401) {
-      window.location.href = '/login'
+    if (typeof window !== 'undefined' && err.response?.status === 401) {
+      const path = window.location.pathname
+      const url = err.config?.url ?? ''
+      const isSetupStatus = url.includes('/setup/status')
+      if (!isPublicRoute(path) && !isSetupStatus) {
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(err)
   }
