@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { CommitGroup } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -13,43 +13,24 @@ function groupPageKey(groups: CommitGroup[]) {
   return groups.map(g => g.id).join('|')
 }
 
-export function SourceGroupsPanel({
+function PaginatedGroupList({
   groups,
-  live,
-  pageSize = DEFAULT_PAGE_SIZE,
+  pageSize,
 }: {
   groups: CommitGroup[]
-  live: boolean
-  pageSize?: number
+  pageSize: number
 }) {
   const [page, setPage] = useState(0)
-  const groupKey = useMemo(() => groupPageKey(groups), [groups])
-
-  useEffect(() => {
-    setPage(0)
-  }, [groupKey])
-
   const total = groups.length
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const safePage = Math.min(page, totalPages - 1)
   const start = safePage * pageSize
   const end = Math.min(start + pageSize, total)
   const visible = groups.slice(start, end)
-
-  if (total === 0) {
-    return (
-      <LedgerPanel className="px-5 py-10 text-center">
-        <p className="text-muted-foreground text-sm">
-          {live ? 'Reading the log…' : 'Nothing grouped yet.'}
-        </p>
-      </LedgerPanel>
-    )
-  }
-
   const showPager = total > pageSize
 
   return (
-    <LedgerPanel className="flex flex-col overflow-hidden">
+    <>
       <ul className="divide-y divide-border/70">
         {visible.map(group => (
           <li key={group.id} className="px-4 py-3.5">
@@ -103,6 +84,34 @@ export function SourceGroupsPanel({
           </div>
         </footer>
       )}
+    </>
+  )
+}
+
+export function SourceGroupsPanel({
+  groups,
+  live,
+  pageSize = DEFAULT_PAGE_SIZE,
+}: {
+  groups: CommitGroup[]
+  live: boolean
+  pageSize?: number
+}) {
+  const groupKey = useMemo(() => groupPageKey(groups), [groups])
+
+  if (groups.length === 0) {
+    return (
+      <LedgerPanel className="px-5 py-10 text-center">
+        <p className="text-muted-foreground text-sm">
+          {live ? 'Reading the log…' : 'Nothing grouped yet.'}
+        </p>
+      </LedgerPanel>
+    )
+  }
+
+  return (
+    <LedgerPanel className="flex flex-col overflow-hidden">
+      <PaginatedGroupList key={groupKey} groups={groups} pageSize={pageSize} />
     </LedgerPanel>
   )
 }

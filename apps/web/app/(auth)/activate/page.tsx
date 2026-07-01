@@ -68,7 +68,7 @@ function ActivateContent() {
   const [deliveryAudience, setDeliveryAudience] = useState('developers')
   const [deliveryPlugin, setDeliveryPlugin] = useState('slack')
   const [deliverySecret, setDeliverySecret] = useState('')
-  const [storyTriggered, setStoryTriggered] = useState(false)
+  const storyTriggeredRef = useRef(false)
 
   const { data: setupStatus } = useQuery({
     queryKey: ['setup-status'],
@@ -131,24 +131,22 @@ function ActivateContent() {
     }
   }, [teamConfig?.activation_complete, router])
 
-  useEffect(() => {
-    if (teamConfig && !aiForm) {
-      setAiForm({
-        provider: teamConfig.ai.provider || 'anthropic',
-        model: teamConfig.ai.model || DEFAULT_AI_MODELS.anthropic,
-        base_url: teamConfig.ai.base_url || '',
-        depth: teamConfig.ai.depth || 'standard',
-        api_key: '',
-      })
-    }
-  }, [teamConfig, aiForm])
+  if (teamConfig && !aiForm) {
+    setAiForm({
+      provider: teamConfig.ai.provider || 'anthropic',
+      model: teamConfig.ai.model || DEFAULT_AI_MODELS.anthropic,
+      base_url: teamConfig.ai.base_url || '',
+      depth: teamConfig.ai.depth || 'standard',
+      api_key: '',
+    })
+  }
 
   useEffect(() => {
-    if (step === 'story' && activeRepo && !storyTriggered && !latestStory) {
-      setStoryTriggered(true)
+    if (step === 'story' && activeRepo && !storyTriggeredRef.current && !latestStory) {
+      storyTriggeredRef.current = true
       trigger.mutate({ repository_id: activeRepo.id })
     }
-  }, [step, activeRepo, storyTriggered, latestStory, trigger])
+  }, [step, activeRepo, latestStory, trigger])
 
   useEffect(() => {
     if (redirected.current || step !== 'story' || !latestStory) return

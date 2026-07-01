@@ -70,7 +70,7 @@ const INTEGRATION_SECRET: Record<string, string> = {
 
 export default function SettingsPage() {
   const qc = useQueryClient()
-  const [tab, setTab] = useState<SettingsTab>('ai')
+  const [tab, setTab] = useState<SettingsTab>(() => tabFromHash())
 
   const { data, isLoading } = useQuery({
     queryKey: ['team-config'],
@@ -86,7 +86,6 @@ export default function SettingsPage() {
   }
 
   useEffect(() => {
-    setTab(tabFromHash())
     function onHashChange() {
       setTab(tabFromHash())
     }

@@ -11,7 +11,7 @@ import { DeliveryLog } from '@/components/story/delivery-log'
 import { DraftPanel, DraftPanelHandle } from '@/components/story/draft-panel'
 import { CopyDraftButton } from '@/components/copy-draft-button'
 import { Send, ChevronLeft, Check, AlertCircle } from 'lucide-react'
-import { useState, use, useEffect, useRef, useCallback } from 'react'
+import { useState, use, useEffect, useRef, useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import {
@@ -107,14 +107,9 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
   })
 
   const groups = groupsData?.data ?? []
-  const drafts = draftsData?.data ?? []
+  const drafts = useMemo(() => draftsData?.data ?? [], [draftsData?.data])
   const waitingForDrafts = isAwaitingDrafts(status, drafts.length, groups.length)
-
-  useEffect(() => {
-    if (drafts.length > 0 && !activeTab) {
-      setActiveTab(drafts[0].audience_id)
-    }
-  }, [drafts, activeTab])
+  const resolvedTab = activeTab ?? drafts[0]?.audience_id
 
   const allApproved = drafts.length > 0 && drafts.every(d => d.status === 'approved')
   const approvedCount = drafts.filter(d => d.status === 'approved').length
@@ -134,11 +129,11 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
     (direction: 1 | -1) => {
       if (drafts.length === 0) return
       const ids = drafts.map(d => d.audience_id)
-      const idx = activeTab ? ids.indexOf(activeTab) : 0
+      const idx = resolvedTab ? ids.indexOf(resolvedTab) : 0
       const next = ids[(idx + direction + ids.length) % ids.length]
       setActiveTab(next)
     },
-    [drafts, activeTab],
+    [drafts, resolvedTab],
   )
 
   useEffect(() => {
@@ -299,7 +294,7 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
                   )}
                 </div>
               ) : (
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <Tabs value={resolvedTab} onValueChange={setActiveTab}>
                   <TabsList className="bg-transparent p-0 gap-1 h-auto flex-wrap justify-start">
                     {drafts.map(draft => (
                       <TabsTrigger
@@ -318,7 +313,7 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
                   {drafts.map(draft => (
                     <TabsContent key={draft.id} value={draft.audience_id} className="mt-4">
                       <DraftPanel
-                        ref={activeTab === draft.audience_id ? draftPanelRef : undefined}
+                        ref={resolvedTab === draft.audience_id ? draftPanelRef : undefined}
                         draft={draft}
                         onRefresh={refetchDrafts}
                         reviewMode
