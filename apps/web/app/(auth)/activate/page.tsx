@@ -33,7 +33,6 @@ import {
   ActivationStepId,
   activationStepIndex,
   ACTIVATION_STEPS,
-  isActivationCompleteLocal,
 } from '@/lib/activation'
 import {
   AUDIENCES,
@@ -126,7 +125,7 @@ function ActivateContent() {
   }, [authError, router])
 
   useEffect(() => {
-    if (teamConfig?.activation_complete || isActivationCompleteLocal()) {
+    if (teamConfig?.activation_complete) {
       router.replace('/dashboard')
     }
   }, [teamConfig?.activation_complete, router])

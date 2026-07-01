@@ -2,7 +2,6 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { teamApi, TeamConfigUpdate, configViewToUpdate } from '@/lib/api'
-import { markActivationCompleteLocal, dismissActivation } from '@/lib/activation'
 
 export function useActivationSave() {
   const qc = useQueryClient()
@@ -30,8 +29,6 @@ export function useMarkActivationComplete() {
       const update = configViewToUpdate(data)
       update.activation_complete = true
       await teamApi.updateConfig(update)
-      markActivationCompleteLocal()
-      dismissActivation()
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['team-config'] })
@@ -44,8 +41,6 @@ export function useSkipActivation() {
 
   return useMutation({
     mutationFn: async () => {
-      dismissActivation()
-      markActivationCompleteLocal()
       const { data } = await teamApi.getConfig()
       if (!data.activation_complete) {
         const update = configViewToUpdate(data)
