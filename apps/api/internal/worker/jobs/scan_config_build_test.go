@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/narratorlog/narratorlog/internal/auth"
 	db "github.com/narratorlog/narratorlog/internal/db"
 	"github.com/narratorlog/narratorlog/internal/teamconfig"
@@ -68,7 +69,7 @@ func TestBuildScanConfigResolvesSourceToken(t *testing.T) {
 		FullName:      "acme/app",
 		DefaultBranch: "main",
 		Provider:      "github",
-		AccessToken:   "encrypted-repo-token-should-not-appear",
+		AccessToken:   pgtype.Text{String: "encrypted-repo-token-should-not-appear", Valid: true},
 	}
 
 	cfg, err := buildScanConfig(repo, time.Now().Add(-time.Hour), time.Now(), tc, enc)

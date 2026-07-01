@@ -21,13 +21,13 @@ import { StatusLine } from '@/components/scan-bits'
 import { SourceGroupsPanel } from '@/components/story/source-groups-panel'
 import { copy } from '@/lib/copy'
 import { getStoryStatusLabel } from '@/lib/status-labels'
-import { LedgerPanel } from '@/components/ledger-list'
 import { cn } from '@/lib/utils'
 
 export default function ScanDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const queryClient = useQueryClient()
   const [draftWaitExpired, setDraftWaitExpired] = useState(false)
+  const [prevWaitingForDrafts, setPrevWaitingForDrafts] = useState(false)
 
   const { data: scan } = useQuery({
     queryKey: ['scan', id],
@@ -77,14 +77,16 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
   const needsReview = status === 'awaiting_approval'
   const waitingForDrafts = isAwaitingDrafts(status, drafts.length, groups.length)
 
+  if (waitingForDrafts !== prevWaitingForDrafts) {
+    setPrevWaitingForDrafts(waitingForDrafts)
+    setDraftWaitExpired(false)
+  }
+
   useEffect(() => {
-    if (!waitingForDrafts) {
-      setDraftWaitExpired(false)
-      return
-    }
+    if (!waitingForDrafts) return
     const timer = setTimeout(() => setDraftWaitExpired(true), DRAFT_WAIT_MS)
     return () => clearTimeout(timer)
-  }, [waitingForDrafts])
+  }, [waitingForDrafts, id, drafts.length, groups.length])
 
   const showDraftFailure = waitingForDrafts && draftWaitExpired && !draftsFetching
 
