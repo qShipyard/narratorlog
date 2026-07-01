@@ -36,9 +36,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${GeistSans.variable} ${display.variable} ${mono.variable} ${serif.variable}`}
+      className={`h-full ${GeistSans.variable} ${display.variable} ${mono.variable} ${serif.variable}`}
     >
-      <body className="antialiased">
+      <body className="antialiased min-h-full">
         <Providers>
           {children}
         </Providers>

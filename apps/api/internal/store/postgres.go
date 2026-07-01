@@ -97,7 +97,7 @@ func (s *PostgresStore) SaveCommits(ctx context.Context, commits []pipeline.Comm
 			return fmt.Errorf("failed to marshal changed files: %w", err)
 		}
 
-		err = s.q.CreateCommitIgnoreDuplicate(ctx, db.CreateCommitParams{
+		err = s.q.CreateCommitIgnoreDuplicate(ctx, db.CreateCommitIgnoreDuplicateParams{
 			ScanID:        commitScanID,
 			RepositoryID:  scan.RepositoryID,
 			Sha:           c.SHA,

@@ -12,9 +12,11 @@ import { cn } from '@/lib/utils'
 import { authApi, User } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 
+import { copy } from '@/lib/copy'
+
 const nav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/scans', label: 'Scans', icon: ScanLine },
+  { href: '/scans', label: copy.stories, icon: ScanLine },
   { href: '/repositories', label: 'Repositories', icon: GitBranch },
   { href: '/team', label: 'Team', icon: Users },
   { href: '/settings', label: 'Settings', icon: Settings },
@@ -30,7 +32,7 @@ export function Sidebar({ user }: { user: User }) {
   }
 
   return (
-    <aside className="w-60 border-r bg-sidebar flex flex-col min-h-screen">
+    <aside className="w-60 border-r border-sidebar-border bg-sidebar flex flex-col h-full shrink-0">
       <div className="px-5 h-16 flex items-center border-b border-sidebar-border">
         <Link href="/dashboard" className="flex items-center gap-2.5">
           <SignalMark />
@@ -48,7 +50,7 @@ export function Sidebar({ user }: { user: User }) {
       <div className="px-3 pt-4">
         <button
           onClick={openCommandPalette}
-          className="w-full flex items-center gap-2.5 rounded-md border px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+          className="w-full flex items-center gap-2.5 rounded-md border border-border/80 bg-card/60 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors shadow-[0_1px_0_oklch(1_0_0/0.5)_inset]"
         >
           <Search className="h-3.5 w-3.5 shrink-0" />
           <span className="flex-1 text-left">Search…</span>

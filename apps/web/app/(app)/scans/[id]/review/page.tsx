@@ -1,34 +1,54 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { scansApi, draftsApi, teamApi, AudienceDraft, ScanStatus } from '@/lib/api'
+import { scansApi, teamApi, ScanStatus } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Textarea } from '@/components/ui/textarea'
-import { PipelineTimeline, isLiveStatus } from '@/components/pipeline-timeline'
-import { NarrationProse } from '@/components/narration-prose'
-import { StatusLine, ScanGroups } from '@/components/scan-bits'
-import { CheckCircle, XCircle, RefreshCw, Send, ChevronLeft, Check, AlertCircle } from 'lucide-react'
-import { useState, use, useEffect, useRef } from 'react'
+import { StatusLine } from '@/components/scan-bits'
+import { SourceGroupsPanel } from '@/components/story/source-groups-panel'
+import { PipelinePanel } from '@/components/story/pipeline-panel'
+import { DeliveryLog } from '@/components/story/delivery-log'
+import { DraftPanel, DraftPanelHandle } from '@/components/story/draft-panel'
+import { CopyDraftButton } from '@/components/copy-draft-button'
+import { Send, ChevronLeft, Check, AlertCircle } from 'lucide-react'
+import { useState, use, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
-import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
 import {
   isAwaitingDrafts,
   shouldPollScanResources,
   shouldPollScanStatus,
 } from '@/lib/scan-polling'
+import { copy } from '@/lib/copy'
+import { getStoryStatusLabel } from '@/lib/status-labels'
+import { allDraftsText } from '@/lib/clipboard'
+import { isLiveStatus } from '@/components/pipeline-timeline'
 
 function apiErrorMessage(err: unknown, fallback: string) {
   return (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
     ?.message ?? fallback
 }
 
+function deliverDisabledReason(opts: {
+  allApproved: boolean
+  hasRouting: boolean
+  status?: ScanStatus
+  pending: boolean
+}): string | null {
+  if (opts.pending) return 'Sending in progress…'
+  if (opts.status === 'delivering') return 'Sending to your channels…'
+  if (opts.status === 'delivered') return 'Already sent'
+  if (!opts.allApproved) return 'Approve all drafts before sending'
+  if (!opts.hasRouting) return 'No delivery routes — copy drafts instead'
+  return null
+}
+
 export default function ReviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const queryClient = useQueryClient()
   const prevStatus = useRef<ScanStatus | undefined>(undefined)
+  const draftPanelRef = useRef<DraftPanelHandle>(null)
+  const [activeTab, setActiveTab] = useState<string | undefined>(undefined)
 
   const { data: scan } = useQuery({
     queryKey: ['scan', id],
@@ -47,7 +67,7 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
 
   useEffect(() => {
     if (prevStatus.current === 'delivering' && status === 'delivered') {
-      toast.success('Delivered to your channels.')
+      toast.success('Sent to your channels.')
     }
     prevStatus.current = status
   }, [status])
@@ -90,6 +110,12 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
   const drafts = draftsData?.data ?? []
   const waitingForDrafts = isAwaitingDrafts(status, drafts.length, groups.length)
 
+  useEffect(() => {
+    if (drafts.length > 0 && !activeTab) {
+      setActiveTab(drafts[0].audience_id)
+    }
+  }, [drafts, activeTab])
+
   const allApproved = drafts.length > 0 && drafts.every(d => d.status === 'approved')
   const approvedCount = drafts.filter(d => d.status === 'approved').length
 
@@ -99,19 +125,74 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
       toast.success('Sending to your channels…')
       queryClient.invalidateQueries({ queryKey: ['scan', id] })
       queryClient.invalidateQueries({ queryKey: ['scan-drafts', id] })
+      queryClient.invalidateQueries({ queryKey: ['scan-deliveries', id] })
     },
-    onError: (err) => toast.error(apiErrorMessage(err, 'Could not deliver. Try again.')),
+    onError: err => toast.error(apiErrorMessage(err, 'Could not deliver. Try again.')),
+  })
+
+  const cycleAudience = useCallback(
+    (direction: 1 | -1) => {
+      if (drafts.length === 0) return
+      const ids = drafts.map(d => d.audience_id)
+      const idx = activeTab ? ids.indexOf(activeTab) : 0
+      const next = ids[(idx + direction + ids.length) % ids.length]
+      setActiveTab(next)
+    },
+    [drafts, activeTab],
+  )
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement
+      const inField =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+
+      if (e.key === 'Escape' && inField) {
+        target.blur()
+        return
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault()
+        draftPanelRef.current?.save()
+        return
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault()
+        draftPanelRef.current?.approve()
+        return
+      }
+
+      if (e.key === 'Tab' && !e.shiftKey && !inField && drafts.length > 1) {
+        e.preventDefault()
+        cycleAudience(1)
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [drafts.length, cycleAudience])
+
+  const sendDisabled =
+    !allApproved || !hasRouting || deliverMutation.isPending || status === 'delivering'
+  const sendReason = deliverDisabledReason({
+    allApproved,
+    hasRouting,
+    status,
+    pending: deliverMutation.isPending,
   })
 
   return (
-    <div className="dark theater min-h-screen text-foreground">
-      <div className="mx-auto max-w-6xl p-8 space-y-8">
+    <div className="p-8 pb-16 max-w-6xl mx-auto space-y-8">
         <header className="space-y-6">
           <div className="flex items-start gap-4">
             <Link href="/scans">
               <Button variant="ghost" size="sm" className="text-muted-foreground">
                 <ChevronLeft className="h-4 w-4 mr-1" />
-                Scans
+                {copy.stories}
               </Button>
             </Link>
             <div className="flex-1 min-w-0">
@@ -127,17 +208,28 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
               )}
             </div>
 
-            <div className="flex items-center gap-3 shrink-0">
-              <span className="font-mono text-xs text-muted-foreground tabular-nums">
+            <div className="flex items-center gap-2 shrink-0">
+              {drafts.length > 0 && (
+                <CopyDraftButton text={allDraftsText(drafts)} label={copy.copyAll} />
+              )}
+              <span className="font-mono text-xs text-muted-foreground tabular-nums hidden sm:inline">
                 {approvedCount}/{drafts.length} approved
               </span>
-              <Button
-                disabled={!allApproved || !hasRouting || deliverMutation.isPending || status === 'delivering'}
-                onClick={() => deliverMutation.mutate()}
-              >
-                <Send className="h-4 w-4 mr-2" />
-                {status === 'delivering' ? 'Delivering…' : status === 'delivered' ? 'Delivered' : 'Deliver all'}
-              </Button>
+              <div className="flex flex-col items-end gap-1">
+                <Button
+                  disabled={sendDisabled}
+                  onClick={() => deliverMutation.mutate()}
+                  title={sendReason ?? undefined}
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  {status === 'delivering' ? 'Sending…' : status === 'delivered' ? copy.sent : copy.sendAll}
+                </Button>
+                {sendReason && !deliverMutation.isPending && status !== 'delivered' && (
+                  <p className="font-mono text-[0.65rem] text-muted-foreground max-w-[12rem] text-right">
+                    {sendReason}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
@@ -146,11 +238,16 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
               <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
               <div className="space-y-2">
                 <p className="text-sm">
-                  No delivery destinations yet. Add a route in Settings to send approved drafts to Slack, email, or another channel.
+                  No delivery destinations yet. Use <strong>Copy all</strong> to share approved drafts manually, or add a route in Settings to send to Slack, email, or another channel.
                 </p>
-                <Link href="/settings#delivery">
-                  <Button variant="outline" size="sm">Set up delivery</Button>
-                </Link>
+                <div className="flex flex-wrap gap-2">
+                  {drafts.length > 0 && (
+                    <CopyDraftButton text={allDraftsText(drafts)} label={copy.copyAll} />
+                  )}
+                  <Link href="/settings#delivery">
+                    <Button variant="outline" size="sm">Set up delivery</Button>
+                  </Link>
+                </div>
               </div>
             </div>
           )}
@@ -158,38 +255,39 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
           {status === 'delivered' && (
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-5 py-4">
               <p className="text-sm text-emerald-400">
-                All routed drafts were sent. Check your channels for the published updates.
+                All routed drafts were sent. Check your channels for the published updates, or copy drafts again if needed.
               </p>
             </div>
           )}
 
-          {status && (
-            <div className="rounded-xl border bg-card/60 px-5 py-4">
-              <PipelineTimeline status={status} />
-            </div>
-          )}
+          {status && <PipelinePanel status={status} />}
+
+          <DeliveryLog scanId={id} status={status} />
         </header>
 
         {status === 'failed' || status === 'cancelled' ? (
           <div className="rounded-xl border bg-card py-16 text-center">
             <p className="font-mono text-sm text-destructive">
-              scan {status} · {scan?.filtered_count ?? 0} commits read before it stopped
+              {status ? getStoryStatusLabel(status) : "Couldn't finish"} · {scan?.filtered_count ?? 0} commits read before it stopped
             </p>
             <p className="text-muted-foreground text-sm mt-2">
-              The story couldn’t be finished. Trigger a new scan to try again.
+              The story couldn&apos;t be finished. Run a new story to try again.
             </p>
           </div>
         ) : (
-          <div className="grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-8">
-            {/* Source — the machine record */}
+          <div className="grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-8 lg:items-start">
             <section className="space-y-3">
               <p className="eyebrow">Source · what shipped</p>
-              <ScanGroups groups={groups} live={live || waitingForDrafts} />
+              <SourceGroupsPanel groups={groups} live={live || waitingForDrafts} />
             </section>
 
-            {/* Narration — the human story */}
-            <section className="space-y-3">
-              <p className="eyebrow">Narration · the story</p>
+            <section className="space-y-3 lg:sticky lg:top-0 lg:self-start">
+              <div className="flex items-center justify-between gap-2">
+                <p className="eyebrow">Narration · the story</p>
+                <p className="font-mono text-[0.6rem] text-muted-foreground hidden md:block">
+                  ⌘S save · ⌘↵ approve · Tab next audience
+                </p>
+              </div>
               {drafts.length === 0 ? (
                 <div className="rounded-xl border bg-card px-5 py-16 text-center">
                   {live || waitingForDrafts ? (
@@ -201,7 +299,7 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
                   )}
                 </div>
               ) : (
-                <Tabs defaultValue={drafts[0]?.audience_id}>
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
                   <TabsList className="bg-transparent p-0 gap-1 h-auto flex-wrap justify-start">
                     {drafts.map(draft => (
                       <TabsTrigger
@@ -219,7 +317,12 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
 
                   {drafts.map(draft => (
                     <TabsContent key={draft.id} value={draft.audience_id} className="mt-4">
-                      <DraftPanel draft={draft} onRefresh={refetchDrafts} />
+                      <DraftPanel
+                        ref={activeTab === draft.audience_id ? draftPanelRef : undefined}
+                        draft={draft}
+                        onRefresh={refetchDrafts}
+                        reviewMode
+                      />
                     </TabsContent>
                   ))}
                 </Tabs>
@@ -227,133 +330,6 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
             </section>
           </div>
         )}
-      </div>
-    </div>
-  )
-}
-
-function DraftPanel({ draft, onRefresh }: { draft: AudienceDraft; onRefresh: () => void }) {
-  const [editing, setEditing] = useState(false)
-  const [content, setContent] = useState(draft.edited_content ?? draft.content)
-
-  const saveMutation = useMutation({
-    mutationFn: () => draftsApi.update(draft.id, content),
-    onSuccess: () => {
-      toast.success('Draft saved.')
-      setEditing(false)
-      onRefresh()
-    },
-    onError: () => toast.error('Failed to save draft.'),
-  })
-
-  const approveMutation = useMutation({
-    mutationFn: () => draftsApi.approve(draft.id),
-    onSuccess: (res) => {
-      toast.success('Draft approved.')
-      if (res.data.all_approved) {
-        toast.success('All drafts approved — ready to deliver.')
-      }
-      onRefresh()
-    },
-    onError: () => toast.error('Failed to approve draft.'),
-  })
-
-  const rejectMutation = useMutation({
-    mutationFn: () => draftsApi.reject(draft.id),
-    onSuccess: () => {
-      toast.success('Draft rejected.')
-      onRefresh()
-    },
-    onError: () => toast.error('Failed to reject draft.'),
-  })
-
-  const regenerateMutation = useMutation({
-    mutationFn: () => draftsApi.regenerate(draft.id),
-    onSuccess: () => {
-      toast.success('Regeneration queued.')
-      onRefresh()
-    },
-    onError: () => toast.error('Failed to regenerate draft.'),
-  })
-
-  const isApproved = draft.status === 'approved'
-
-  return (
-    <div className={cn('rounded-xl border bg-card overflow-hidden', isApproved && 'border-emerald-500/30')}>
-      <div className="flex items-center justify-between gap-2 px-5 py-3 border-b">
-        <span className="font-mono text-[0.65rem] uppercase tracking-[0.12em] text-muted-foreground">
-          {draft.tone} tone
-        </span>
-        <div className="flex items-center gap-1.5">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => regenerateMutation.mutate()}
-            disabled={regenerateMutation.isPending || isApproved}
-          >
-            <RefreshCw className="h-3.5 w-3.5 mr-1" />
-            Regenerate
-          </Button>
-          {!editing && !isApproved && (
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-              Edit
-            </Button>
-          )}
-          {editing && (
-            <>
-              <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-                Save
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="px-6 py-6">
-        {editing ? (
-          <Textarea
-            value={content}
-            onChange={e => setContent(e.target.value)}
-            className="min-h-96 font-mono text-xs resize-none"
-          />
-        ) : (
-          <NarrationProse content={draft.edited_content ?? draft.content} />
-        )}
-      </div>
-
-      {!isApproved ? (
-        <div className="px-5 py-3 border-t flex items-center justify-end gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => rejectMutation.mutate()}
-            disabled={rejectMutation.isPending}
-          >
-            <XCircle className="h-3.5 w-3.5 mr-1" />
-            Reject
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => approveMutation.mutate()}
-            disabled={approveMutation.isPending}
-          >
-            <CheckCircle className="h-3.5 w-3.5 mr-1" />
-            Approve
-          </Button>
-        </div>
-      ) : (
-        draft.approved_by && (
-          <div className="px-5 py-3 border-t">
-            <p className="font-mono text-[0.7rem] text-emerald-400">
-              approved by {draft.approved_by.name}
-              {draft.approved_at && ` · ${formatDistanceToNow(new Date(draft.approved_at), { addSuffix: true })}`}
-            </p>
-          </div>
-        )
-      )}
     </div>
   )
 }

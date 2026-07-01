@@ -55,34 +55,34 @@
 
 :root {
   /* Ledger ink — prussian + signal amber on cool paper */
-  --background: oklch(0.972 0.005 247);
-  --foreground: oklch(0.205 0.02 250);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.205 0.02 250);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.205 0.02 250);
-  --primary: oklch(0.4 0.075 248);
+  --background: oklch(0.968 0.006 248);
+  --foreground: oklch(0.19 0.025 252);
+  --card: oklch(0.995 0.002 248);
+  --card-foreground: oklch(0.19 0.025 252);
+  --popover: oklch(0.995 0.002 248);
+  --popover-foreground: oklch(0.19 0.025 252);
+  --primary: oklch(0.36 0.08 252);
   --primary-foreground: oklch(0.985 0.005 250);
-  --secondary: oklch(0.955 0.006 248);
-  --secondary-foreground: oklch(0.32 0.04 250);
-  --muted: oklch(0.955 0.006 248);
-  --muted-foreground: oklch(0.52 0.02 250);
-  --accent: oklch(0.93 0.02 248);
-  --accent-foreground: oklch(0.32 0.05 250);
+  --secondary: oklch(0.948 0.008 248);
+  --secondary-foreground: oklch(0.28 0.04 252);
+  --muted: oklch(0.948 0.008 248);
+  --muted-foreground: oklch(0.48 0.025 252);
+  --accent: oklch(0.925 0.014 248);
+  --accent-foreground: oklch(0.28 0.045 252);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.905 0.007 248);
-  --input: oklch(0.905 0.007 248);
-  --ring: oklch(0.55 0.07 248);
-  --signal: oklch(0.76 0.15 73);
-  --signal-foreground: oklch(0.3 0.05 70);
-  --rail: oklch(0.88 0.01 248);
+  --border: oklch(0.878 0.012 248);
+  --input: oklch(0.878 0.012 248);
+  --ring: oklch(0.52 0.075 252);
+  --signal: oklch(0.74 0.155 68);
+  --signal-foreground: oklch(0.28 0.06 65);
+  --rail: oklch(0.84 0.014 248);
   --chart-1: oklch(0.4 0.075 248);
   --chart-2: oklch(0.55 0.07 248);
   --chart-3: oklch(0.76 0.15 73);
   --chart-4: oklch(0.65 0.06 200);
   --chart-5: oklch(0.5 0.08 300);
   --radius: 0.5rem;
-  --sidebar: oklch(0.988 0.003 247);
+  --sidebar: oklch(0.982 0.004 248);
   --sidebar-foreground: oklch(0.205 0.02 250);
   --sidebar-primary: oklch(0.4 0.075 248);
   --sidebar-primary-foreground: oklch(0.985 0.005 250);
@@ -162,14 +162,44 @@
   }
   .rail-node::before {
     content: "";
-    @apply absolute top-[1.35rem] -left-[1.4rem] z-[1] size-[7px] rounded-full bg-rail ring-4 ring-background;
+    @apply absolute top-[1.35rem] -left-[1.4rem] z-[1] size-[7px] rounded-[2px] bg-rail ring-4 ring-card;
   }
   .rail-node.is-signal::before {
-    @apply bg-signal;
+    @apply bg-signal ring-signal/15;
   }
 
-  /* Investigation theater — the dark register for live scans and review.
-     A near-invisible dot grid gives the ink ground presence without motion. */
+  /* App shell — cool paper ground for operational pages */
+  .ledger-paper {
+    background-color: var(--background);
+    background-image:
+      linear-gradient(
+        to bottom,
+        color-mix(in oklch, var(--foreground) 3%, transparent),
+        transparent 120px
+      ),
+      radial-gradient(
+        color-mix(in oklch, var(--foreground) 5%, transparent) 1px,
+        transparent 1px
+      );
+    background-size: auto, 24px 24px;
+  }
+
+  /* Story workspace — focused split view without jarring dark island */
+  .ledger-workspace {
+    @apply min-h-full;
+    background-color: var(--background);
+    background-image: linear-gradient(
+      90deg,
+      color-mix(in oklch, var(--border) 40%, transparent) 0,
+      color-mix(in oklch, var(--border) 40%, transparent) 1px,
+      transparent 1px,
+      transparent 100%
+    );
+    background-size: min(42%, 520px) 100%;
+    background-repeat: no-repeat;
+  }
+
+  /* Investigation theater — optional dark register (review deep-focus) */
   .theater {
     background-color: var(--background);
     background-image: radial-gradient(

@@ -8,9 +8,10 @@ import { Check, X } from 'lucide-react'
 import { teamApi, Repository, Scan } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { SignalMark } from '@/components/signal-mark'
-import { useScanTrigger } from '@/lib/hooks/use-scan-trigger'
 import { duration, ease } from '@/lib/motion'
+import { copy } from '@/lib/copy'
 import { cn } from '@/lib/utils'
+import { ActivationStepId } from '@/lib/activation'
 
 const DISMISS_KEY = 'nl-onboarding-dismissed'
 
@@ -24,8 +25,26 @@ const dismissStore = {
   getServer: () => false,
   set() {
     localStorage.setItem(DISMISS_KEY, '1')
-    dismissStore.listeners.forEach((l) => l())
+    dismissStore.listeners.forEach(l => l())
   },
+}
+
+function hasGitSource(config: Awaited<ReturnType<typeof teamApi.getConfig>>['data']): boolean {
+  return ['github', 'gitlab', 'bitbucket'].some(
+    p => config.sources?.[p]?.token_set === true,
+  )
+}
+
+function nextActivationStep(
+  config: Awaited<ReturnType<typeof teamApi.getConfig>>['data'],
+  repos: Repository[],
+  scans: Scan[],
+): ActivationStepId {
+  if (!config.ai.api_key_set) return 'ai'
+  if (!hasGitSource(config)) return 'git'
+  if (repos.length === 0) return 'repo'
+  if (scans.length === 0) return 'story'
+  return 'story'
 }
 
 export function FirstRunChecklist({
@@ -40,14 +59,14 @@ export function FirstRunChecklist({
     dismissStore.get,
     dismissStore.getServer,
   )
-  const trigger = useScanTrigger()
 
   const { data: config } = useQuery({
     queryKey: ['team-config'],
-    queryFn: () => teamApi.getConfig().then((r) => r.data),
+    queryFn: () => teamApi.getConfig().then(r => r.data),
   })
 
-  const reviewable = scans.find((s) => s.status === 'awaiting_approval')
+  const reviewable = scans.find(s => s.status === 'awaiting_approval')
+  const activateStep = config ? nextActivationStep(config, repos, scans) : 'ai'
 
   const steps = [
     {
@@ -55,55 +74,51 @@ export function FirstRunChecklist({
       description: 'The model that turns commits into prose.',
       done: config?.ai.api_key_set === true,
       cta: (
-        <Link href="/settings#ai">
+        <Link href="/activate?step=ai">
           <Button size="sm">Add a key</Button>
         </Link>
       ),
     },
     {
-      title: 'Connect a repository',
+      title: 'Connect git & a repository',
       description: 'Point narratorlog at the code it should read.',
-      done: repos.length > 0,
+      done: repos.length > 0 && hasGitSource(config!),
       cta: (
-        <Link href="/repositories">
+        <Link href="/activate?step=git">
           <Button size="sm">Connect a repository</Button>
         </Link>
       ),
     },
     {
-      title: 'Run your first scan',
+      title: 'Run your first story',
       description: 'Read back what shipped as a story.',
       done: scans.length > 0,
       cta: (
-        <Button
-          size="sm"
-          disabled={trigger.isPending || repos.length === 0}
-          onClick={() => repos[0] && trigger.mutate({ repository_id: repos[0].id })}
-        >
-          {trigger.isPending ? 'Queuing…' : 'Run first scan'}
-        </Button>
+        <Link href="/activate?step=story">
+          <Button size="sm">{copy.runFirstStory}</Button>
+        </Link>
       ),
     },
     {
       title: 'Review & deliver',
       description: 'Approve the draft and send it where your team reads.',
-      done: scans.some((s) => s.status === 'delivered'),
+      done: scans.some(s => s.status === 'delivered'),
       cta: reviewable ? (
         <Link href={`/scans/${reviewable.id}/review`}>
           <Button size="sm">Review draft</Button>
         </Link>
       ) : (
         <Link href="/scans">
-          <Button size="sm" variant="outline">View scans</Button>
+          <Button size="sm" variant="outline">{copy.viewStories}</Button>
         </Link>
       ),
     },
   ]
 
-  const currentIndex = steps.findIndex((s) => !s.done)
+  const currentIndex = steps.findIndex(s => !s.done)
   const allDone = currentIndex === -1
 
-  if (dismissed || allDone || !config) return null
+  if (dismissed || allDone || !config || config.activation_complete) return null
 
   return (
     <AnimatePresence>
@@ -116,16 +131,21 @@ export function FirstRunChecklist({
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="eyebrow">Setup · {steps.filter((s) => s.done).length} of {steps.length}</p>
+            <p className="eyebrow">Setup · {steps.filter(s => s.done).length} of {steps.length}</p>
             <h2 className="font-display text-lg font-semibold mt-1">Get to your first story</h2>
           </div>
-          <button
-            onClick={() => dismissStore.set()}
-            aria-label="Dismiss setup"
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <Link href={`/activate?step=${activateStep}`}>
+              <Button size="sm" variant="outline">Continue setup</Button>
+            </Link>
+            <button
+              onClick={() => dismissStore.set()}
+              aria-label="Dismiss setup"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <ol className="mt-5 space-y-1">

@@ -98,7 +98,27 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $
 ON CONFLICT (scan_id, sha) DO NOTHING
 `
 
-func (q *Queries) CreateCommitIgnoreDuplicate(ctx context.Context, arg CreateCommitParams) error {
+type CreateCommitIgnoreDuplicateParams struct {
+	ScanID        uuid.UUID          `json:"scan_id"`
+	RepositoryID  uuid.UUID          `json:"repository_id"`
+	Sha           string             `json:"sha"`
+	Message       string             `json:"message"`
+	AuthorName    string             `json:"author_name"`
+	AuthorEmail   string             `json:"author_email"`
+	CommittedAt   pgtype.Timestamptz `json:"committed_at"`
+	PrNumber      pgtype.Int4        `json:"pr_number"`
+	PrTitle       pgtype.Text        `json:"pr_title"`
+	PrDescription pgtype.Text        `json:"pr_description"`
+	LinkedIssues  []byte             `json:"linked_issues"`
+	ChangedFiles  []byte             `json:"changed_files"`
+	Diff          pgtype.Text        `json:"diff"`
+	IsNoise       bool               `json:"is_noise"`
+	IsBot         bool               `json:"is_bot"`
+	IsBreaking    bool               `json:"is_breaking"`
+	Domain        pgtype.Text        `json:"domain"`
+}
+
+func (q *Queries) CreateCommitIgnoreDuplicate(ctx context.Context, arg CreateCommitIgnoreDuplicateParams) error {
 	_, err := q.db.Exec(ctx, createCommitIgnoreDuplicate,
 		arg.ScanID,
 		arg.RepositoryID,

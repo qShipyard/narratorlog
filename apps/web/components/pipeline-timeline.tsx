@@ -9,7 +9,7 @@ const STAGES = [
   { key: 'summarizing', label: 'Narrate' },
   { key: 'awaiting_approval', label: 'Review' },
   { key: 'delivering', label: 'Deliver' },
-  { key: 'delivered', label: 'Delivered' },
+  { key: 'delivered', label: 'Sent' },
 ] as const
 
 const STATUS_INDEX: Record<ScanStatus, number> = {

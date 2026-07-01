@@ -3,92 +3,83 @@ import { Button } from '@/components/ui/button'
 import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-
-type Tone = 'signal' | 'success' | 'destructive' | 'active' | 'muted'
-
-const statusConfig: Record<ScanStatus, { label: string; tone: Tone }> = {
-  pending:           { label: 'Pending',         tone: 'muted' },
-  running:           { label: 'Running',         tone: 'active' },
-  filtering:         { label: 'Filtering',       tone: 'active' },
-  enriching:         { label: 'Enriching',       tone: 'active' },
-  reading_context:   { label: 'Reading context', tone: 'active' },
-  chunking:          { label: 'Chunking',        tone: 'active' },
-  summarizing:       { label: 'Summarizing',     tone: 'active' },
-  awaiting_approval: { label: 'Needs review',    tone: 'signal' },
-  approved:          { label: 'Approved',        tone: 'success' },
-  delivering:        { label: 'Delivering',      tone: 'active' },
-  delivered:         { label: 'Delivered',       tone: 'success' },
-  failed:            { label: 'Failed',          tone: 'destructive' },
-  cancelled:         { label: 'Cancelled',       tone: 'muted' },
-}
-
-const toneClass: Record<Tone, string> = {
-  signal: 'bg-signal/15 text-signal-foreground',
-  success: 'text-emerald-700 dark:text-emerald-400',
-  destructive: 'bg-destructive/10 text-destructive',
-  active: 'text-primary',
-  muted: 'text-muted-foreground',
-}
+import { getStoryStatus, STATUS_TONE_CLASS } from '@/lib/status-labels'
 
 function StatusChip({ status }: { status: ScanStatus }) {
-  const { label, tone } = statusConfig[status]
-  const live = tone === 'active'
+  const { label, tone } = getStoryStatus(status)
+  const live = tone === 'live'
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 font-mono text-[0.65rem] font-bold uppercase tracking-[0.12em]',
-        toneClass[tone],
+        'inline-flex items-center gap-1.5 rounded-sm border border-current/15 px-1.5 py-0.5 font-mono text-[0.625rem] font-bold uppercase tracking-[0.14em]',
+        STATUS_TONE_CLASS[tone],
       )}
     >
-      {live && <span className="size-1.5 rounded-full bg-current animate-pulse" />}
+      {live && <span className="size-1.5 rounded-[1px] bg-current animate-pulse" />}
       {label}
     </span>
   )
 }
 
-export function ScanCard({ scan, highlight }: { scan: Scan; highlight?: boolean }) {
+export function ScanCard({
+  scan,
+  highlight,
+  preview,
+}: {
+  scan: Scan
+  highlight?: boolean
+  preview?: string
+}) {
   const needsReview = scan.status === 'awaiting_approval'
 
   return (
     <div
       className={cn(
-        'rail-node group flex items-center gap-4 rounded-lg border border-transparent px-4 py-3.5 transition-colors',
+        'rail-node group flex items-start gap-4 px-5 py-4 transition-colors',
         needsReview || highlight
-          ? 'is-signal bg-signal/[0.06] hover:bg-signal/10'
-          : 'hover:bg-muted/60',
+          ? 'is-signal bg-signal/[0.04] hover:bg-signal/[0.07]'
+          : 'hover:bg-muted/40',
       )}
     >
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2.5">
-          <span className="font-mono text-[0.8rem] font-bold truncate text-foreground">
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <span className="font-mono text-[0.8125rem] font-bold tracking-tight truncate text-foreground">
             {scan.repository?.full_name ?? 'Unknown repository'}
           </span>
           <StatusChip status={scan.status} />
         </div>
-        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="font-mono">{scan.commit_count} commits</span>
+        {preview ? (
+          <p className="mt-2 text-sm text-foreground/75 leading-relaxed line-clamp-2 font-serif">
+            {preview}
+          </p>
+        ) : null}
+        <div
+          className={cn(
+            'flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground',
+            preview ? 'mt-2' : 'mt-1.5',
+          )}
+        >
+          <span className="font-mono tabular-nums">{scan.commit_count} commits</span>
           <span className="text-rail">·</span>
-          <span className="font-mono">{scan.filtered_count} filtered</span>
+          <span className="font-mono tabular-nums">{scan.filtered_count} filtered</span>
           <span className="text-rail">·</span>
           <span>{formatDistanceToNow(new Date(scan.created_at), { addSuffix: true })}</span>
         </div>
       </div>
 
-      {needsReview ? (
-        <Link href={`/scans/${scan.id}/review`}>
-          <Button size="sm">Review</Button>
-        </Link>
-      ) : (
-        <Link href={`/scans/${scan.id}`}>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="opacity-60 group-hover:opacity-100"
-          >
-            View
-          </Button>
-        </Link>
-      )}
+      <div className="shrink-0 pt-0.5">
+        {needsReview ? (
+          <Link href={`/scans/${scan.id}/review`}>
+            <Button size="sm">Review</Button>
+          </Link>
+        ) : (
+          <Link href={`/scans/${scan.id}`}>
+            <Button variant="outline" size="sm" className="opacity-70 group-hover:opacity-100">
+              View
+            </Button>
+          </Link>
+        )}
+      </div>
     </div>
   )
 }

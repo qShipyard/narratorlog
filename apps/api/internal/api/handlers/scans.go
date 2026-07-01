@@ -274,6 +274,60 @@ func (h *Handler) ListScanDrafts(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": data})
 }
 
+func (h *Handler) ListScanDeliveries(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		errorResponse(c, http.StatusBadRequest, "INVALID_ID", "Invalid scan ID.")
+		return
+	}
+
+	teamID, err := uuid.Parse(c.GetString("team_id"))
+	if err != nil {
+		errorResponse(c, http.StatusUnauthorized, "INVALID_SESSION", "Invalid session.")
+		return
+	}
+
+	scan, err := h.queries.GetScanByID(c.Request.Context(), id)
+	if err != nil {
+		errorResponse(c, http.StatusNotFound, "NOT_FOUND", "Scan not found.")
+		return
+	}
+
+	repo, err := h.queries.GetRepositoryByID(c.Request.Context(), scan.RepositoryID)
+	if err != nil || repo.TeamID != teamID {
+		errorResponse(c, http.StatusNotFound, "NOT_FOUND", "Scan not found.")
+		return
+	}
+
+	rows, err := h.queries.ListDeliveriesByScan(c.Request.Context(), id)
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to fetch deliveries.")
+		return
+	}
+
+	data := make([]gin.H, len(rows))
+	for i, row := range rows {
+		item := gin.H{
+			"id":            row.ID,
+			"draft_id":      row.DraftID,
+			"audience_id":   row.AudienceID,
+			"output_plugin": row.OutputPlugin,
+			"status":        row.Status,
+			"attempt_count": row.AttemptCount,
+			"created_at":    row.CreatedAt,
+		}
+		if row.DeliveredAt.Valid {
+			item["delivered_at"] = row.DeliveredAt.Time
+		}
+		if len(row.Response) > 0 {
+			item["response"] = row.Response
+		}
+		data[i] = item
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": data})
+}
+
 func (h *Handler) DeliverScan(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {

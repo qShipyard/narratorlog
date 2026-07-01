@@ -112,6 +112,50 @@ export interface Comment {
   created_at: string
 }
 
+export interface ScanDelivery {
+  id: string
+  draft_id: string
+  audience_id: string
+  output_plugin: string
+  status: 'pending' | 'success' | 'failed'
+  attempt_count: number
+  delivered_at?: string
+  created_at: string
+  response?: unknown
+}
+
+export interface HealthCheck {
+  ok: boolean
+  active?: number
+}
+
+export interface HealthResponse {
+  status: 'ok' | 'degraded'
+  version: string
+  checks: {
+    database?: HealthCheck
+    redis?: HealthCheck
+    worker?: HealthCheck
+  }
+}
+
+export interface TeamMember {
+  id: string
+  name: string
+  email: string
+  role: User['role']
+  avatar_url?: string
+  created_at: string
+}
+
+export interface InviteMemberResponse {
+  id: string
+  name: string
+  email: string
+  role: User['role']
+  temporary_password: string
+}
+
 export interface Pagination {
   next_cursor?: string
   has_more: boolean
@@ -146,6 +190,7 @@ export interface TeamConfigView {
   integrations: Record<string, Record<string, boolean>>
   routing: RoutingEntry[]
   sources: Record<string, { token_set: boolean; base_url: string }>
+  activation_complete: boolean
 }
 
 export interface TeamConfigUpdate {
@@ -160,6 +205,7 @@ export interface TeamConfigUpdate {
   integrations: Record<string, Record<string, string>> // empty value = keep existing
   routing: RoutingEntry[]
   sources: Record<string, { token: string; base_url: string }>
+  activation_complete: boolean
 }
 
 // Build an update payload that preserves everything in the current config.
@@ -182,10 +228,15 @@ export function configViewToUpdate(v: TeamConfigView): TeamConfigUpdate {
     integrations: {},
     routing: v.routing ?? [],
     sources,
+    activation_complete: v.activation_complete ?? false,
   }
 }
 
 // ─── API calls ────────────────────────────────────────────────────────────────
+
+export const healthApi = {
+  get: () => api.get<HealthResponse>('/health'),
+}
 
 export const setupApi = {
   status: () => api.get<{ setup_complete: boolean }>('/setup/status'),
@@ -230,6 +281,7 @@ export const scansApi = {
   groups: (id: string) => api.get<{ data: CommitGroup[] }>(`/api/v1/scans/${id}/groups`),
   drafts: (id: string) => api.get<{ data: AudienceDraft[] }>(`/api/v1/scans/${id}/drafts`),
   deliver: (id: string) => api.post(`/api/v1/scans/${id}/deliver`),
+  deliveries: (id: string) => api.get<{ data: ScanDelivery[] }>(`/api/v1/scans/${id}/deliveries`),
 }
 
 export const draftsApi = {
@@ -248,9 +300,11 @@ export const draftsApi = {
 
 export const teamApi = {
   get: () => api.get('/api/v1/team'),
-  members: () => api.get('/api/v1/team/members'),
-  invite: (email: string, role: string) => api.post('/api/v1/team/invite', { email, role }),
-  updateRole: (id: string, role: string) => api.patch(`/api/v1/team/members/${id}`, { role }),
+  members: () => api.get<{ data: TeamMember[] }>('/api/v1/team/members'),
+  invite: (data: { name: string; email: string; role: User['role'] }) =>
+    api.post<InviteMemberResponse>('/api/v1/team/invite', data),
+  updateRole: (id: string, role: User['role']) =>
+    api.patch<{ id: string; role: User['role'] }>(`/api/v1/team/members/${id}`, { role }),
   remove: (id: string) => api.delete(`/api/v1/team/members/${id}`),
   getConfig: () => api.get<TeamConfigView>('/api/v1/team/config'),
   updateConfig: (data: TeamConfigUpdate) =>
