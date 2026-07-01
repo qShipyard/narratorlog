@@ -52,17 +52,33 @@ The stack is a Go API + background worker, a Next.js web app, a Rust codebase re
 Just want to try it? With Docker running, from the repo root:
 
 ```bash
-docker compose -f deploy/docker-compose.quickstart.yml up --build
+docker compose -f deploy/docker-compose.quickstart.yml up -d --build
 ```
 
 This builds everything, runs the database migrations automatically, and starts the
 whole stack with safe localhost defaults — no `.env` and no config required. The
 first run downloads base images and compiles the API, worker, web app, and reader —
 expect several minutes before the stack is ready. When it finishes, open
-**http://localhost:3000** and complete the first-run setup wizard.
+**http://localhost:3000** — on a fresh database you land on the setup wizard first
+(workspace, admin account, then activation).
 
 > The quickstart uses insecure placeholder secrets and plain HTTP for local trials
 > only. For a real deployment, use the production setup below.
+
+**Useful commands**
+
+```bash
+# Follow logs
+docker compose -f deploy/docker-compose.quickstart.yml logs -f
+
+# Stop the stack (keeps your database)
+docker compose -f deploy/docker-compose.quickstart.yml down
+
+# Fresh start — wipes the database and runs setup from scratch
+# (use this if migrate fails or you want a clean first-run experience)
+docker compose -f deploy/docker-compose.quickstart.yml down -v
+docker compose -f deploy/docker-compose.quickstart.yml up -d --build
+```
 
 ### Run it locally (development)
 
@@ -110,10 +126,11 @@ curl https://your-domain.com/health   # {"status":"ok","version":"0.1.0"}
 
 ### First-run setup
 
-The first time you open the web app it runs a setup wizard to create your team and admin account.
-After logging in, go to **Settings** to configure your AI provider (Anthropic, OpenAI, or Ollama) and
-API key, your delivery channels, and privacy options — these are required before scans can summarize or deliver.
-To connect a git repository, go to **Settings → Sources** and paste a Personal Access Token for your provider.
+The first time you open the web app on a fresh database, you are sent to `/setup` to
+create your workspace and admin account, then `/activate` to connect git, AI, and
+your first story. After that, sign in at `/login` on future visits.
+
+You can also configure AI, delivery, and privacy later under **Settings**.
 
 ---
 

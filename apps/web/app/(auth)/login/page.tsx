@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
 import { motion } from 'motion/react'
-import { authApi } from '@/lib/api'
+import { authApi, setupApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,6 +17,26 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const { data: setupStatus } = useQuery({
+    queryKey: ['setup-status'],
+    queryFn: () => setupApi.status().then(r => r.data),
+    retry: false,
+  })
+
+  useEffect(() => {
+    if (setupStatus && !setupStatus.setup_complete) {
+      router.replace('/setup')
+    }
+  }, [setupStatus, router])
+
+  if (!setupStatus || !setupStatus.setup_complete) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-muted-foreground text-sm">Loading…</div>
+      </div>
+    )
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()

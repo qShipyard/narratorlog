@@ -139,6 +139,25 @@
   html {
     @apply font-sans;
   }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  label[for],
+  summary,
+  [data-slot="button"]:not(:disabled),
+  [data-slot="tabs-trigger"]:not(:disabled),
+  [data-slot="select-trigger"]:not(:disabled),
+  [data-slot="dropdown-menu-item"]:not([data-disabled]),
+  [data-slot="dropdown-menu-checkbox-item"]:not([data-disabled]),
+  [data-slot="dropdown-menu-radio-item"]:not([data-disabled]),
+  [data-slot="dropdown-menu-sub-trigger"]:not([data-disabled]) {
+    @apply cursor-pointer;
+  }
+  button:disabled,
+  [aria-disabled="true"],
+  [data-disabled] {
+    @apply cursor-not-allowed;
+  }
 }
 
 @layer components {
