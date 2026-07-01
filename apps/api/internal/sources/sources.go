@@ -15,6 +15,8 @@ type Client interface {
 	ListRepos(ctx context.Context, token, baseURL string) ([]Repo, error)
 	RegisterWebhook(ctx context.Context, token, baseURL, owner, repo, webhookURL, secret string) error
 	ValidateToken(ctx context.Context, token, baseURL string) error
+	AuthenticatedUser(ctx context.Context, token, baseURL string) (string, error)
+	ListBranches(ctx context.Context, token, baseURL, owner, repo string) ([]string, error)
 }
 
 func For(provider string) (Client, bool) {

@@ -1,24 +1,20 @@
-export type RepoCadence = 'weekly' | 'on-tag' | 'on-merge' | 'manual'
+export type RepoCadence = 'manual' | 'daily' | 'weekly' | 'monthly'
 
-export function repoCadence(config: Record<string, unknown>): RepoCadence | undefined {
+export const CADENCE_OPTIONS: { value: RepoCadence; label: string }[] = [
+  { value: 'manual', label: 'Manual only' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+]
+
+export function repoCadence(config: Record<string, unknown>): RepoCadence {
   const cadence = config?.cadence
-  if (cadence === 'weekly' || cadence === 'on-tag' || cadence === 'on-merge' || cadence === 'manual') {
+  if (cadence === 'daily' || cadence === 'weekly' || cadence === 'monthly') {
     return cadence
   }
-  return undefined
+  return 'manual'
 }
 
 export function repoScheduleLabel(config: Record<string, unknown>): string {
-  switch (repoCadence(config)) {
-    case 'weekly':
-      return 'Every Monday at 9:00 UTC'
-    case 'on-tag':
-      return 'On release tag'
-    case 'on-merge':
-      return 'On merged PR'
-    case 'manual':
-      return 'Manual only'
-    default:
-      return 'Manual only'
-  }
+  return CADENCE_OPTIONS.find(o => o.value === repoCadence(config))?.label ?? 'Manual only'
 }

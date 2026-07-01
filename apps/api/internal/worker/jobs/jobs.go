@@ -6,6 +6,7 @@ const (
 	JobScan      = "scan:run"
 	JobDeliver   = "scan:deliver"
 	JobScheduled = "scan:scheduled"
+	JobDueCheck  = "scan:due-check"
 	JobCleanup   = "scan:cleanup"
 )
 

@@ -17,14 +17,19 @@ import (
 // It writes a JSON request to stdin and reads a JSON response from stdout.
 // This is the only way the Go pipeline communicates with TypeScript plugins.
 type PluginRunner struct {
-	// Timeout for a single plugin call. Defaults to 30s.
+	// Timeout for a single AI/output plugin call. Defaults to 30s.
 	Timeout time.Duration
+	// SourceTimeout bounds a source-plugin fetch, which legitimately makes many
+	// sequential provider API calls (per-PR, per-commit) and needs a wider budget
+	// than a single AI request.
+	SourceTimeout time.Duration
 }
 
 // NewPluginRunner returns a PluginRunner with sensible defaults.
 func NewPluginRunner() *PluginRunner {
 	return &PluginRunner{
-		Timeout: 30 * time.Second,
+		Timeout:       30 * time.Second,
+		SourceTimeout: 120 * time.Second,
 	}
 }
 
@@ -43,13 +48,13 @@ func BuildPluginEnv(vars map[string]string) []string {
 
 // run spawns the plugin at pluginPath, writes request as JSON to stdin,
 // and returns the raw stdout bytes as the response.
-func (p *PluginRunner) run(ctx context.Context, pluginPath string, request any, extraEnv []string) ([]byte, error) {
+func (p *PluginRunner) run(ctx context.Context, pluginPath string, request any, extraEnv []string, timeout time.Duration) ([]byte, error) {
 	reqBytes, err := json.Marshal(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal plugin request: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, p.Timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "node", pluginPath)
@@ -87,7 +92,7 @@ func (p *PluginRunner) CallSourcePlugin(
 	pluginPath string,
 	req SourcePluginRequest,
 ) (*SourcePluginResponse, error) {
-	raw, err := p.run(ctx, pluginPath, req, nil)
+	raw, err := p.run(ctx, pluginPath, req, nil, p.SourceTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("source plugin call failed: %w", err)
 	}
@@ -112,7 +117,7 @@ func (p *PluginRunner) CallSummarize(
 	pluginPath string,
 	req SummarizePluginRequest,
 ) (*SummarizePluginResponse, error) {
-	raw, err := p.run(ctx, pluginPath, req, nil)
+	raw, err := p.run(ctx, pluginPath, req, nil, p.Timeout)
 	if err != nil {
 		return nil, fmt.Errorf("summarize plugin call failed: %w", err)
 	}
@@ -140,7 +145,7 @@ func (p *PluginRunner) CallGenerate(
 	pluginPath string,
 	req GeneratePluginRequest,
 ) (*GeneratePluginResponse, error) {
-	raw, err := p.run(ctx, pluginPath, req, nil)
+	raw, err := p.run(ctx, pluginPath, req, nil, p.Timeout)
 	if err != nil {
 		return nil, fmt.Errorf("generate plugin call failed: %w", err)
 	}
@@ -167,7 +172,7 @@ func (p *PluginRunner) CallDeliverPlugin(
 	req DeliverPluginRequest,
 	extraEnv []string,
 ) (*DeliverPluginResponse, error) {
-	raw, err := p.run(ctx, pluginPath, req, extraEnv)
+	raw, err := p.run(ctx, pluginPath, req, extraEnv, p.Timeout)
 	if err != nil {
 		return nil, fmt.Errorf("deliver plugin call failed: %w", err)
 	}

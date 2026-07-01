@@ -37,6 +37,28 @@ This is a living document. Updated as the project evolves.
 - [ ] Rust reader — Python, Rust, Ruby support
 - [ ] GitHub Action marketplace listing
 
+## v0.4 — Automation & Personal Shipping Log
+Goal: scans run themselves; manual runs remain only as a double-check. Each user tracks the PRs *they* authored, not whole-team branch activity.
+
+**Personal PR scoping**
+- [x] Resolve PAT owner's provider identity (`GET /user`) and store it per connection (`teamconfig.Source.Login`)
+- [x] GitHub: filter pipeline input to PRs authored by that user — across any base branch
+- [x] GitLab (merge requests) + Bitbucket (PRs, nickname-matched) author-centric flip
+- [x] Configurable target/base branch selection per repository (per-repo settings dialog: cadence + live base-branch picker)
+
+**Automation (both triggers)**
+- [x] Due-scanner tick: hourly due-check driven by `cadence` + `last_scanned_at` (replaces boot-time static cron; picks up repos added after boot)
+- [x] Cadence options — daily, weekly, monthly (`ListDueRepos`)
+- [x] Event-driven scans: webhooks enqueue on PR merge (GitHub `pull_request` merged) / push
+- [x] Manual scan retained as an explicit "run now" double-check
+
+**Local LLM**
+- [ ] Ollama batteries-included compose profile — auto-pull a recommended small model for offline/out-of-box use (BYO still supported)
+
+**Parked ideas**
+- Quality digests / metrics report type (separate from automation plumbing)
+- Real-time scan progress via WebSocket (carried from v0.2)
+
 ## v1.0 — Stable
 - [ ] Production-hardened pipeline
 - [ ] Full test coverage on core pipeline

@@ -50,6 +50,12 @@ type ScanConfig struct {
 	ScanTo        time.Time
 	AccessToken   string
 	SourceBaseURL string
+	// AuthorLogin scopes a personal scan to PRs this handle authored. Empty means
+	// no author scoping (whole-repo activity).
+	AuthorLogin string
+	// BaseBranches, when non-empty, keeps only PR commits whose base/target branch
+	// is in this set. Empty means all base branches.
+	BaseBranches []string
 
 	// Filter
 	SkipAuthors  []string
@@ -153,6 +159,7 @@ type SourcePluginRequest struct {
 	AccessToken string `json:"access_token"`
 	Depth       string `json:"depth"`
 	BaseURL     string `json:"base_url,omitempty"`
+	AuthorLogin string `json:"author_login,omitempty"`
 }
 
 type SourcePluginResponse struct {
@@ -169,6 +176,8 @@ type SourcePluginCommit struct {
 	PRNumber      *int     `json:"pr_number,omitempty"`
 	PRTitle       *string  `json:"pr_title,omitempty"`
 	PRDescription *string  `json:"pr_description,omitempty"`
+	PRAuthorLogin *string  `json:"pr_author_login,omitempty"`
+	PRBaseBranch  *string  `json:"pr_base_branch,omitempty"`
 	ChangedFiles  []string `json:"changed_files"`
 	Diff          *string  `json:"diff,omitempty"`
 }

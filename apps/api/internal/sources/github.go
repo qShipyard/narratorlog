@@ -84,6 +84,50 @@ func (g *githubClient) ListRepos(ctx context.Context, token, baseURL string) ([]
 	return all, nil
 }
 
+func (g *githubClient) ListBranches(ctx context.Context, token, baseURL, owner, repo string) ([]string, error) {
+	base := g.resolveBase(baseURL)
+	var all []string
+	page := 1
+
+	for {
+		url := fmt.Sprintf("%s/repos/%s/%s/branches?per_page=100&page=%d", base, owner, repo, page)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch GitHub branches: %w", err)
+		}
+		if resp.StatusCode >= 400 {
+			resp.Body.Close()
+			return nil, fmt.Errorf("GitHub branches request failed with status %d", resp.StatusCode)
+		}
+
+		var batch []struct {
+			Name string `json:"name"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&batch); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("failed to decode GitHub branches: %w", err)
+		}
+		resp.Body.Close()
+
+		for _, b := range batch {
+			all = append(all, b.Name)
+		}
+		if len(batch) < 100 {
+			break
+		}
+		page++
+	}
+
+	return all, nil
+}
+
 func (g *githubClient) RegisterWebhook(ctx context.Context, token, baseURL, owner, repo, webhookURL, secret string) error {
 	base := g.resolveBase(baseURL)
 	url := fmt.Sprintf("%s/repos/%s/%s/hooks", base, owner, repo)
@@ -91,7 +135,7 @@ func (g *githubClient) RegisterWebhook(ctx context.Context, token, baseURL, owne
 	payload, err := json.Marshal(map[string]interface{}{
 		"name":   "web",
 		"active": true,
-		"events": []string{"push", "create"},
+		"events": []string{"push", "create", "pull_request"},
 		"config": map[string]string{
 			"url":          webhookURL,
 			"content_type": "json",
@@ -124,25 +168,35 @@ func (g *githubClient) RegisterWebhook(ctx context.Context, token, baseURL, owne
 }
 
 func (g *githubClient) ValidateToken(ctx context.Context, token, baseURL string) error {
-	base := g.resolveBase(baseURL)
-	url := base + "/user"
+	_, err := g.AuthenticatedUser(ctx, token, baseURL)
+	return err
+}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+func (g *githubClient) AuthenticatedUser(ctx context.Context, token, baseURL string) (string, error) {
+	base := g.resolveBase(baseURL)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/user", nil)
 	if err != nil {
-		return err
+		return "", err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to validate GitHub token: %w", err)
+		return "", fmt.Errorf("failed to fetch GitHub user: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("GitHub token validation failed with status %d", resp.StatusCode)
+		return "", fmt.Errorf("GitHub user request failed with status %d", resp.StatusCode)
 	}
 
-	return nil
+	var u struct {
+		Login string `json:"login"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&u); err != nil {
+		return "", fmt.Errorf("failed to decode GitHub user: %w", err)
+	}
+	return u.Login, nil
 }

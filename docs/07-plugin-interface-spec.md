@@ -52,6 +52,14 @@ The SDK provides:
 
 Fetches raw commits from a git platform.
 
+narratorlog is a **personal shipping log**: the access token is a personal one, so
+it doubles as identity. When `author_login` is set on the request, a source plugin
+should return only the commits from PRs that handle authored — merged into **any**
+base branch, not just the repo default. When it is absent, the plugin falls back to
+branch-centric listing (all activity on `branch`). The token owner's handle is
+resolved once when the token is saved (via the provider's authenticated-user
+endpoint) and stored on the source connection.
+
 ### Interface
 
 ```typescript
@@ -70,11 +78,14 @@ export class MySourcePlugin implements SourcePlugin {
 interface SourceRequest {
   provider: string              // 'github' | 'gitlab' | 'bitbucket' | 'git_cli'
   repo: string                  // 'org/repo'
-  branch: string                // 'main'
+  branch: string                // 'main' — used only for branch-centric fallback
   scan_from: string             // ISO 8601 UTC
   scan_to: string               // ISO 8601 UTC
-  access_token: string          // OAuth token for platform API
+  access_token: string          // personal access token for the platform API
   depth: 'messages-only' | 'standard' | 'deep'
+  base_url?: string             // self-hosted / enterprise API base
+  author_login?: string         // when set, scope to PRs THIS handle authored
+                                // (any base branch); the personal shipping log
 }
 
 interface RawCommit {
@@ -86,6 +97,8 @@ interface RawCommit {
   pr_number?: number
   pr_title?: string
   pr_description?: string
+  pr_author_login?: string      // the PR author (for author-scoped provenance)
+  pr_base_branch?: string       // the branch the PR merged into
   changed_files: string[]
   diff?: string                 // only included if depth >= 'standard'
 }
