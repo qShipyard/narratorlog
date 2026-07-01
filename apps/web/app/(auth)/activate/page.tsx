@@ -32,7 +32,6 @@ import {
   parseActivationStep,
   ActivationStepId,
   activationStepIndex,
-  activationStepHref,
   ACTIVATION_STEPS,
   isActivationCompleteLocal,
 } from '@/lib/activation'
@@ -324,9 +323,7 @@ function ActivateContent() {
                     </div>
                   )}
                   <div className="flex gap-2 pt-2">
-                    <Button variant="outline" asChild>
-                      <Link href={activationStepHref('ai')}>Back</Link>
-                    </Button>
+                    <Button variant="outline" onClick={() => goToStep('ai')}>Back</Button>
                     <Button className="flex-1" disabled={save.isPending} onClick={handleSaveGit}>
                       {save.isPending ? 'Saving…' : 'Continue'}
                     </Button>
@@ -359,18 +356,10 @@ function ActivateContent() {
                     {activeRepo ? 'Connect another repository' : 'Browse repositories'}
                   </Button>
                   <div className="flex gap-2 pt-2">
-                    <Button variant="outline" asChild>
-                      <Link href={activationStepHref('git')}>Back</Link>
+                    <Button variant="outline" onClick={() => goToStep('git')}>Back</Button>
+                    <Button className="flex-1" disabled={!activeRepo} onClick={() => goToStep('delivery')}>
+                      Continue
                     </Button>
-                    {activeRepo ? (
-                      <Button className="flex-1" asChild>
-                        <Link href={activationStepHref('delivery')}>Continue</Link>
-                      </Button>
-                    ) : (
-                      <Button className="flex-1" disabled>
-                        Continue
-                      </Button>
-                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -418,12 +407,8 @@ function ActivateContent() {
                     onChange={setDeliverySecret}
                   />
                   <div className="flex gap-2 pt-2">
-                    <Button variant="outline" asChild>
-                      <Link href={activationStepHref('repo')}>Back</Link>
-                    </Button>
-                    <Button variant="ghost" asChild>
-                      <Link href={activationStepHref('story')}>Skip</Link>
-                    </Button>
+                    <Button variant="outline" onClick={() => goToStep('repo')}>Back</Button>
+                    <Button variant="ghost" onClick={() => goToStep('story')}>Skip</Button>
                     <Button className="flex-1" disabled={save.isPending} onClick={handleSaveDelivery}>
                       {save.isPending ? 'Saving…' : 'Continue'}
                     </Button>
@@ -444,9 +429,7 @@ function ActivateContent() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {!activeRepo ? (
-                    <Button asChild>
-                      <Link href={activationStepHref('repo')}>Connect a repository</Link>
-                    </Button>
+                    <Button onClick={() => goToStep('repo')}>Connect a repository</Button>
                   ) : (
                     <>
                       <div className="flex items-center gap-2 text-sm">
@@ -463,9 +446,9 @@ function ActivateContent() {
                           <p className="text-sm text-muted-foreground">
                             {liveScan?.error_hint ?? 'Check your AI key and try again.'}
                           </p>
-                          <Button variant="outline" size="sm" asChild>
-                            <Link href="/settings#ai">Open AI settings</Link>
-                          </Button>
+                          <Link href="/settings#ai">
+                            <Button variant="outline" size="sm">Open AI settings</Button>
+                          </Link>
                         </div>
                       )}
                       {displayStatus === 'awaiting_approval' && latestStory && (

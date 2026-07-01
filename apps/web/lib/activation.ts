@@ -23,10 +23,6 @@ export function activationStepIndex(step: ActivationStepId): number {
   return ACTIVATION_STEPS.findIndex(s => s.id === step)
 }
 
-export function activationStepHref(step: ActivationStepId): string {
-  return step === 'ai' ? '/activate' : `/activate?step=${step}`
-}
-
 export function isActivationDismissed(): boolean {
   return typeof window !== 'undefined' && localStorage.getItem(ACTIVATION_DISMISS_KEY) === '1'
 }
