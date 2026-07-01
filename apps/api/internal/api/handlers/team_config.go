@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	db "github.com/narratorlog/narratorlog/internal/db"
+	"github.com/narratorlog/narratorlog/internal/sources"
 	"github.com/narratorlog/narratorlog/internal/teamconfig"
 )
 
@@ -59,6 +60,25 @@ func (h *Handler) UpdateTeamConfig(c *gin.Context) {
 	if err := cfg.ApplyUpdate(req, h.encryptor); err != nil {
 		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to apply config.")
 		return
+	}
+
+	// When a new source token is supplied, resolve the handle that owns it so
+	// personal scans can be scoped to that identity's PRs. A failed lookup means
+	// the token is invalid — reject rather than save an unusable connection.
+	for provider, in := range req.Sources {
+		if in.Token == "" {
+			continue
+		}
+		client, ok := sources.For(provider)
+		if !ok {
+			continue
+		}
+		login, err := client.AuthenticatedUser(c.Request.Context(), in.Token, in.BaseURL)
+		if err != nil {
+			errorResponse(c, http.StatusBadRequest, "INVALID_TOKEN", "Could not verify the "+provider+" token. Check the token and try again.")
+			return
+		}
+		cfg.SetSourceLogin(provider, login)
 	}
 
 	out, err := cfg.Marshal()

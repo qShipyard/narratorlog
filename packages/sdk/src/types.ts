@@ -16,6 +16,8 @@ export interface SourceRequest {
   access_token: string
   depth: AIDepth
   base_url?: string
+  /** When set, scope the fetch to PRs this handle authored (any base branch). */
+  author_login?: string
 }
 
 export interface RawCommit {
@@ -27,6 +29,8 @@ export interface RawCommit {
   pr_number?: number
   pr_title?: string
   pr_description?: string
+  pr_author_login?: string
+  pr_base_branch?: string
   changed_files: string[]
   diff?: string
 }

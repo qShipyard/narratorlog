@@ -28,6 +28,9 @@ type Output struct {
 type Source struct {
 	TokenEncrypted string `json:"token_encrypted,omitempty"`
 	BaseURL        string `json:"base_url,omitempty"`
+	// Login is the handle that owns the token, resolved from the provider when the
+	// token is saved. Personal scans are scoped to this identity's PRs. Not secret.
+	Login string `json:"login,omitempty"`
 }
 
 type Config struct {
@@ -155,6 +158,7 @@ type AIView struct {
 type SourceView struct {
 	TokenSet bool   `json:"token_set"`
 	BaseURL  string `json:"base_url"`
+	Login    string `json:"login,omitempty"`
 }
 
 type ClientView struct {
@@ -179,6 +183,7 @@ func (c *Config) View() ClientView {
 		sources[provider] = SourceView{
 			TokenSet: s.TokenEncrypted != "",
 			BaseURL:  s.BaseURL,
+			Login:    s.Login,
 		}
 	}
 	return ClientView{
@@ -194,6 +199,18 @@ func (c *Config) View() ClientView {
 		Sources:            sources,
 		Routing:            c.Routing,
 		ActivationComplete: c.ActivationComplete,
+	}
+}
+
+// SetSourceLogin records the resolved token-owner handle for a provider. No-op
+// if the provider has no source configured yet.
+func (c *Config) SetSourceLogin(provider, login string) {
+	if c.Sources == nil {
+		return
+	}
+	if s, ok := c.Sources[provider]; ok {
+		s.Login = login
+		c.Sources[provider] = s
 	}
 }
 

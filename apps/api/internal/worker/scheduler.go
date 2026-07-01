@@ -1,23 +1,19 @@
 package worker
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/hibiken/asynq"
-	"github.com/jackc/pgx/v5/pgxpool"
-	db "github.com/narratorlog/narratorlog/internal/db"
 	"github.com/narratorlog/narratorlog/internal/worker/jobs"
 )
 
 type Scheduler struct {
 	scheduler *asynq.Scheduler
-	queries   *db.Queries
 }
 
-func NewScheduler(redisURL string, pool *pgxpool.Pool) (*Scheduler, error) {
+func NewScheduler(redisURL string) (*Scheduler, error) {
 	opt, err := asynq.ParseRedisURI(redisURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse redis URL: %w", err)
@@ -30,39 +26,17 @@ func NewScheduler(redisURL string, pool *pgxpool.Pool) (*Scheduler, error) {
 		},
 	})
 
-	return &Scheduler{
-		scheduler: s,
-		queries:   db.New(pool),
-	}, nil
+	return &Scheduler{scheduler: s}, nil
 }
 
-// RegisterWeeklyScans registers a cron entry for each active weekly repo.
-// Runs every Monday at 09:00 UTC.
-func (s *Scheduler) RegisterWeeklyScans(ctx context.Context) error {
-	repos, err := s.queries.ListActiveWeeklyRepos(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to list active repos: %w", err)
+// RegisterDueScanner registers a single periodic tick. The DueCheckProcessor
+// decides on each tick which repos are actually due (per their cadence and
+// last_scanned_at), so repos added or edited after boot are picked up without a
+// worker restart — the flaw of the old per-repo boot-time cron.
+func (s *Scheduler) RegisterDueScanner() error {
+	if _, err := s.scheduler.Register("@every 1h", asynq.NewTask(jobs.JobDueCheck, nil)); err != nil {
+		return fmt.Errorf("failed to register due-scanner: %w", err)
 	}
-
-	for _, repo := range repos {
-		payload, err := jobs.Marshal(jobs.ScanPayload{
-			RepositoryID: repo.ID.String(),
-			TeamID:       repo.TeamID.String(),
-			TriggerType:  "scheduled",
-			Lookback:     "7d",
-		})
-		if err != nil {
-			log.Printf("[scheduler] failed to marshal payload for repo %s: %v", repo.FullName, err)
-			continue
-		}
-
-		task := asynq.NewTask(jobs.JobScan, payload)
-		// Every Monday at 09:00 UTC
-		if _, err := s.scheduler.Register("0 9 * * 1", task); err != nil {
-			log.Printf("[scheduler] failed to register repo %s: %v", repo.FullName, err)
-		}
-	}
-
 	return nil
 }
 
