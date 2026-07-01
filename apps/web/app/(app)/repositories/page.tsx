@@ -8,11 +8,12 @@ import { SignalMark } from '@/components/signal-mark'
 import { LedgerList, LedgerPanel } from '@/components/ledger-list'
 import { RevealGroup, RevealItem } from '@/components/reveal'
 import { ConnectRepoDialog } from '@/components/repositories/connect-repo-dialog'
+import { RepoSettingsDialog } from '@/components/repositories/repo-settings-dialog'
 import { isLiveStatus } from '@/components/pipeline-timeline'
 import { useScanTrigger } from '@/lib/hooks/use-scan-trigger'
 import { getRepoStoryStatusLabel } from '@/lib/status-labels'
 import { copy } from '@/lib/copy'
-import { GitBranch, ExternalLink, Plus } from 'lucide-react'
+import { GitBranch, ExternalLink, Plus, Settings } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -34,6 +35,7 @@ function RepoRow({ repo, latest }: { repo: Repository; latest?: Scan }) {
   const live = latest ? isLiveStatus(latest.status) : false
   const needsReview = latest?.status === 'awaiting_approval'
   const pending = trigger.isPending && trigger.variables?.repository_id === repo.id
+  const [showSettings, setShowSettings] = useState(false)
 
   return (
     <div className="group flex items-center gap-4 px-5 py-4 hover:bg-muted/40 transition-colors">
@@ -95,6 +97,15 @@ function RepoRow({ repo, latest }: { repo: Repository; latest?: Scan }) {
           </Button>
         </Link>
 
+        <Button
+          variant="ghost"
+          size="sm"
+          className="opacity-60 group-hover:opacity-100"
+          onClick={() => setShowSettings(true)}
+        >
+          <Settings className="h-4 w-4" />
+        </Button>
+
         <a
           href={repo.url}
           target="_blank"
@@ -104,6 +115,12 @@ function RepoRow({ repo, latest }: { repo: Repository; latest?: Scan }) {
           <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-foreground" />
         </a>
       </div>
+
+      <RepoSettingsDialog
+        open={showSettings}
+        repo={repo}
+        onClose={() => setShowSettings(false)}
+      />
     </div>
   )
 }

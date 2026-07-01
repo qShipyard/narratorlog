@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"net/http"
 	"time"
@@ -47,46 +49,59 @@ func (h *Handler) GitHubWebhook(c *gin.Context) {
 		}
 	}
 
-	event := c.GetHeader("X-GitHub-Event")
-
-	switch event {
+	switch c.GetHeader("X-GitHub-Event") {
 	case "push", "create":
-		payload, _ := jobs.Marshal(jobs.ScanPayload{
-			RepositoryID: repo.ID.String(),
-			TeamID:       repo.TeamID.String(),
-			TriggerType:  "webhook",
-			Lookback:     "7d",
-		})
-
-		// Create scan record
-		scan, err := h.queries.CreateScan(c.Request.Context(), db.CreateScanParams{
-			TeamID:         repo.TeamID,
-			RepositoryID:   repo.ID,
-			Status:         db.ScanStatusPending,
-			TriggeredBy:    db.ScanTriggerWebhook,
-			ScanFrom:       pgtype.Timestamptz{Time: lookbackToTime("7d"), Valid: true},
-			ScanTo:         pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-			ConfigSnapshot: h.routingSnapshot(c.Request.Context(), repo.TeamID),
-		})
-		if err != nil {
-			c.JSON(http.StatusOK, gin.H{"received": true})
-			return
+		h.enqueueWebhookScan(c.Request.Context(), repo)
+	case "pull_request":
+		// A personal scan only surfaces the user's own PRs, so triggering on any
+		// merged PR is safe — the pipeline filters to the token owner's work.
+		if webhookPRMerged(body) {
+			h.enqueueWebhookScan(c.Request.Context(), repo)
 		}
-
-		// Update payload with scan ID
-		payload, _ = jobs.Marshal(jobs.ScanPayload{
-			ScanID:       scan.ID.String(),
-			RepositoryID: repo.ID.String(),
-			TeamID:       repo.TeamID.String(),
-			TriggerType:  "webhook",
-			Lookback:     "7d",
-		})
-
-		task := asynq.NewTask(jobs.JobScan, payload)
-		h.asynq.Enqueue(task)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"received": true})
+}
+
+// webhookPRMerged reports whether a GitHub pull_request event is a merge (closed
+// with merged=true) rather than a plain close.
+func webhookPRMerged(body []byte) bool {
+	var e struct {
+		Action      string `json:"action"`
+		PullRequest struct {
+			Merged bool `json:"merged"`
+		} `json:"pull_request"`
+	}
+	if err := json.Unmarshal(body, &e); err != nil {
+		return false
+	}
+	return e.Action == "closed" && e.PullRequest.Merged
+}
+
+// enqueueWebhookScan creates a pending scan for a repo and queues it. Shared by
+// every webhook provider; failures are swallowed so we still return 200 and avoid
+// signalling internals to the sender.
+func (h *Handler) enqueueWebhookScan(ctx context.Context, repo db.Repository) {
+	scan, err := h.queries.CreateScan(ctx, db.CreateScanParams{
+		TeamID:         repo.TeamID,
+		RepositoryID:   repo.ID,
+		Status:         db.ScanStatusPending,
+		TriggeredBy:    db.ScanTriggerWebhook,
+		ScanFrom:       pgtype.Timestamptz{Time: lookbackToTime("7d"), Valid: true},
+		ScanTo:         pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+		ConfigSnapshot: h.routingSnapshot(ctx, repo.TeamID),
+	})
+	if err != nil {
+		return
+	}
+	payload, _ := jobs.Marshal(jobs.ScanPayload{
+		ScanID:       scan.ID.String(),
+		RepositoryID: repo.ID.String(),
+		TeamID:       repo.TeamID.String(),
+		TriggerType:  "webhook",
+		Lookback:     "7d",
+	})
+	h.asynq.Enqueue(asynq.NewTask(jobs.JobScan, payload))
 }
 
 func (h *Handler) GitLabWebhook(c *gin.Context) {
@@ -110,40 +125,9 @@ func (h *Handler) GitLabWebhook(c *gin.Context) {
 		}
 	}
 
-	event := c.GetHeader("X-Gitlab-Event")
-
-	if event == "Push Hook" {
-		payload, _ := jobs.Marshal(jobs.ScanPayload{
-			RepositoryID: repo.ID.String(),
-			TeamID:       repo.TeamID.String(),
-			TriggerType:  "webhook",
-			Lookback:     "7d",
-		})
-
-		scan, err := h.queries.CreateScan(c.Request.Context(), db.CreateScanParams{
-			TeamID:         repo.TeamID,
-			RepositoryID:   repo.ID,
-			Status:         db.ScanStatusPending,
-			TriggeredBy:    db.ScanTriggerWebhook,
-			ScanFrom:       pgtype.Timestamptz{Time: lookbackToTime("7d"), Valid: true},
-			ScanTo:         pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-			ConfigSnapshot: h.routingSnapshot(c.Request.Context(), repo.TeamID),
-		})
-		if err != nil {
-			c.JSON(http.StatusOK, gin.H{"received": true})
-			return
-		}
-
-		payload, _ = jobs.Marshal(jobs.ScanPayload{
-			ScanID:       scan.ID.String(),
-			RepositoryID: repo.ID.String(),
-			TeamID:       repo.TeamID.String(),
-			TriggerType:  "webhook",
-			Lookback:     "7d",
-		})
-
-		task := asynq.NewTask(jobs.JobScan, payload)
-		h.asynq.Enqueue(task)
+	switch c.GetHeader("X-Gitlab-Event") {
+	case "Push Hook", "Merge Request Hook":
+		h.enqueueWebhookScan(c.Request.Context(), repo)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"received": true})
@@ -165,40 +149,9 @@ func (h *Handler) BitbucketWebhook(c *gin.Context) {
 		return
 	}
 
-	event := c.GetHeader("X-Event-Key")
-
-	if event == "repo:push" {
-		payload, _ := jobs.Marshal(jobs.ScanPayload{
-			RepositoryID: repo.ID.String(),
-			TeamID:       repo.TeamID.String(),
-			TriggerType:  "webhook",
-			Lookback:     "7d",
-		})
-
-		scan, err := h.queries.CreateScan(c.Request.Context(), db.CreateScanParams{
-			TeamID:         repo.TeamID,
-			RepositoryID:   repo.ID,
-			Status:         db.ScanStatusPending,
-			TriggeredBy:    db.ScanTriggerWebhook,
-			ScanFrom:       pgtype.Timestamptz{Time: lookbackToTime("7d"), Valid: true},
-			ScanTo:         pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-			ConfigSnapshot: h.routingSnapshot(c.Request.Context(), repo.TeamID),
-		})
-		if err != nil {
-			c.JSON(http.StatusOK, gin.H{"received": true})
-			return
-		}
-
-		payload, _ = jobs.Marshal(jobs.ScanPayload{
-			ScanID:       scan.ID.String(),
-			RepositoryID: repo.ID.String(),
-			TeamID:       repo.TeamID.String(),
-			TriggerType:  "webhook",
-			Lookback:     "7d",
-		})
-
-		task := asynq.NewTask(jobs.JobScan, payload)
-		h.asynq.Enqueue(task)
+	switch c.GetHeader("X-Event-Key") {
+	case "repo:push", "pullrequest:fulfilled":
+		h.enqueueWebhookScan(c.Request.Context(), repo)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"received": true})

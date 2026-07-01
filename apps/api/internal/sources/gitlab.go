@@ -111,6 +111,54 @@ func (g *gitlabClient) resolveProjectID(ctx context.Context, token, base, owner,
 	return project.ID, nil
 }
 
+func (g *gitlabClient) ListBranches(ctx context.Context, token, baseURL, owner, repo string) ([]string, error) {
+	base := g.resolveBase(baseURL)
+	projectID, err := g.resolveProjectID(ctx, token, base, owner, repo)
+	if err != nil {
+		return nil, err
+	}
+
+	var all []string
+	page := 1
+	for {
+		reqURL := fmt.Sprintf("%s/api/v4/projects/%d/repository/branches?per_page=100&page=%d", base, projectID, page)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("PRIVATE-TOKEN", token)
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch GitLab branches: %w", err)
+		}
+		if resp.StatusCode >= 400 {
+			resp.Body.Close()
+			return nil, fmt.Errorf("GitLab branches request failed with status %d", resp.StatusCode)
+		}
+
+		var batch []struct {
+			Name string `json:"name"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&batch); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("failed to decode GitLab branches: %w", err)
+		}
+		nextPage := resp.Header.Get("X-Next-Page")
+		resp.Body.Close()
+
+		for _, b := range batch {
+			all = append(all, b.Name)
+		}
+		if nextPage == "" {
+			break
+		}
+		page++
+	}
+
+	return all, nil
+}
+
 func (g *gitlabClient) RegisterWebhook(ctx context.Context, token, baseURL, owner, repo, webhookURL, secret string) error {
 	base := g.resolveBase(baseURL)
 
@@ -120,9 +168,10 @@ func (g *gitlabClient) RegisterWebhook(ctx context.Context, token, baseURL, owne
 	}
 
 	payload, err := json.Marshal(map[string]interface{}{
-		"url":         webhookURL,
-		"token":       secret,
-		"push_events": true,
+		"url":                   webhookURL,
+		"token":                 secret,
+		"push_events":           true,
+		"merge_requests_events": true,
 	})
 	if err != nil {
 		return err
@@ -150,24 +199,34 @@ func (g *gitlabClient) RegisterWebhook(ctx context.Context, token, baseURL, owne
 }
 
 func (g *gitlabClient) ValidateToken(ctx context.Context, token, baseURL string) error {
-	base := g.resolveBase(baseURL)
-	reqURL := base + "/api/v4/user"
+	_, err := g.AuthenticatedUser(ctx, token, baseURL)
+	return err
+}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+func (g *gitlabClient) AuthenticatedUser(ctx context.Context, token, baseURL string) (string, error) {
+	base := g.resolveBase(baseURL)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/api/v4/user", nil)
 	if err != nil {
-		return err
+		return "", err
 	}
 	req.Header.Set("PRIVATE-TOKEN", token)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to validate GitLab token: %w", err)
+		return "", fmt.Errorf("failed to fetch GitLab user: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("GitLab token validation failed with status %d", resp.StatusCode)
+		return "", fmt.Errorf("GitLab user request failed with status %d", resp.StatusCode)
 	}
 
-	return nil
+	var u struct {
+		Username string `json:"username"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&u); err != nil {
+		return "", fmt.Errorf("failed to decode GitLab user: %w", err)
+	}
+	return u.Username, nil
 }

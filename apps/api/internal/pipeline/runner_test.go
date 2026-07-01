@@ -183,3 +183,26 @@ func TestRunner_SourceFailureFailsScan(t *testing.T) {
 		t.Errorf("expected running status (worker marks failed after retries), got %q", store.lastStatus())
 	}
 }
+
+func TestKeepByBaseBranch(t *testing.T) {
+	commits := []SourcePluginCommit{
+		{SHA: "a", PRBaseBranch: strPtr("main")},
+		{SHA: "b", PRBaseBranch: strPtr("develop")},
+		{SHA: "c", PRBaseBranch: nil}, // no PR base → always kept
+		{SHA: "d", PRBaseBranch: strPtr("release")},
+	}
+
+	all := keepByBaseBranch(commits, nil)
+	if len(all) != 4 {
+		t.Fatalf("empty filter should keep all, got %d", len(all))
+	}
+
+	filtered := keepByBaseBranch(commits, []string{"main", "release"})
+	got := map[string]bool{}
+	for _, c := range filtered {
+		got[c.SHA] = true
+	}
+	if !got["a"] || !got["c"] || !got["d"] || got["b"] {
+		t.Fatalf("unexpected kept set: %v", got)
+	}
+}

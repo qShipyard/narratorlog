@@ -164,8 +164,16 @@ func TestBitbucketClient_RegisterWebhook(t *testing.T) {
 		if !capturedPayload.Active {
 			t.Errorf("active: want true, got false")
 		}
-		if len(capturedPayload.Events) != 1 || capturedPayload.Events[0] != "repo:push" {
-			t.Errorf("events: want [repo:push], got %v", capturedPayload.Events)
+		wantEvents := []string{"repo:push", "pullrequest:fulfilled"}
+		if len(capturedPayload.Events) != len(wantEvents) {
+			t.Errorf("events: want %v, got %v", wantEvents, capturedPayload.Events)
+		} else {
+			for i, e := range wantEvents {
+				if capturedPayload.Events[i] != e {
+					t.Errorf("events: want %v, got %v", wantEvents, capturedPayload.Events)
+					break
+				}
+			}
 		}
 	})
 

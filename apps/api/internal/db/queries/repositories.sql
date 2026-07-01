@@ -35,7 +35,15 @@ WHERE id = $1;
 SELECT * FROM repositories
 WHERE team_id = $1 AND provider = $2 AND provider_id = $3;
 
--- name: ListActiveWeeklyRepos :many
+-- name: ListDueRepos :many
+-- Active repos whose cadence says they're due for another scan, based on when
+-- they last ran. Drives the automated due-scanner tick.
 SELECT * FROM repositories
 WHERE is_active = true
-  AND config->>'cadence' = 'weekly';
+  AND config->>'cadence' IN ('daily', 'weekly', 'monthly')
+  AND (
+    last_scanned_at IS NULL
+    OR (config->>'cadence' = 'daily'   AND last_scanned_at < now() - interval '1 day')
+    OR (config->>'cadence' = 'weekly'  AND last_scanned_at < now() - interval '7 days')
+    OR (config->>'cadence' = 'monthly' AND last_scanned_at < now() - interval '1 month')
+  );

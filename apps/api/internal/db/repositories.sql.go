@@ -141,14 +141,22 @@ func (q *Queries) GetRepositoryByProviderID(ctx context.Context, arg GetReposito
 	return i, err
 }
 
-const listActiveWeeklyRepos = `-- name: ListActiveWeeklyRepos :many
+const listDueRepos = `-- name: ListDueRepos :many
 SELECT id, team_id, provider, provider_id, name, full_name, url, default_branch, access_token, webhook_secret, config, is_active, last_scanned_at, created_at, updated_at FROM repositories
 WHERE is_active = true
-  AND config->>'cadence' = 'weekly'
+  AND config->>'cadence' IN ('daily', 'weekly', 'monthly')
+  AND (
+    last_scanned_at IS NULL
+    OR (config->>'cadence' = 'daily'   AND last_scanned_at < now() - interval '1 day')
+    OR (config->>'cadence' = 'weekly'  AND last_scanned_at < now() - interval '7 days')
+    OR (config->>'cadence' = 'monthly' AND last_scanned_at < now() - interval '1 month')
+  )
 `
 
-func (q *Queries) ListActiveWeeklyRepos(ctx context.Context) ([]Repository, error) {
-	rows, err := q.db.Query(ctx, listActiveWeeklyRepos)
+// Active repos whose cadence says they're due for another scan, based on when
+// they last ran. Drives the automated due-scanner tick.
+func (q *Queries) ListDueRepos(ctx context.Context) ([]Repository, error) {
+	rows, err := q.db.Query(ctx, listDueRepos)
 	if err != nil {
 		return nil, err
 	}

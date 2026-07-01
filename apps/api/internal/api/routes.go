@@ -38,6 +38,7 @@ func RegisterRoutes(r *gin.Engine, h *handlers.Handler, sessions *auth.SessionMa
 		api.POST("/repos", h.ConnectRepo)
 		api.GET("/repos/available", h.ListAvailableRepos)
 		api.GET("/repos/:id", h.GetRepo)
+		api.GET("/repos/:id/branches", h.ListRepoBranches)
 		api.PATCH("/repos/:id", h.UpdateRepo)
 		api.DELETE("/repos/:id", h.DisconnectRepo)
 

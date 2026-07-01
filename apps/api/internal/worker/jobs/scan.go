@@ -236,6 +236,17 @@ func buildScanConfig(
 	}
 	cfg.AccessToken = token
 	cfg.SourceBaseURL = baseURL
+	if s, ok := tc.Sources[string(repo.Provider)]; ok {
+		cfg.AuthorLogin = s.Login
+	}
+
+	var repoCfg struct {
+		BaseBranches []string `json:"base_branches"`
+	}
+	if len(repo.Config) > 0 {
+		_ = json.Unmarshal(repo.Config, &repoCfg)
+	}
+	cfg.BaseBranches = repoCfg.BaseBranches
 
 	if tc.AI.APIKeyEncrypted == "" {
 		return pipeline.ScanConfig{}, fmt.Errorf("No AI API key configured. Go to Settings → AI provider and add your API key.")
