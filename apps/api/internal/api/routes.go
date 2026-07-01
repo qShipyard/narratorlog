@@ -15,9 +15,6 @@ func RegisterRoutes(r *gin.Engine, h *handlers.Handler, sessions *auth.SessionMa
 	r.GET("/setup/status", h.IsSetupComplete)
 	r.POST("/setup", h.Setup)
 
-	// OAuth
-	r.GET("/auth/github", h.GitHubOAuthRedirect)
-	r.GET("/auth/github/callback", h.GitHubOAuthCallback)
 	r.POST("/auth/login", h.Login)
 	r.POST("/auth/logout", h.Logout)
 
@@ -25,6 +22,8 @@ func RegisterRoutes(r *gin.Engine, h *handlers.Handler, sessions *auth.SessionMa
 	webhooks := r.Group("/webhooks")
 	{
 		webhooks.POST("/github", h.GitHubWebhook)
+		webhooks.POST("/gitlab", h.GitLabWebhook)
+		webhooks.POST("/bitbucket", h.BitbucketWebhook)
 	}
 
 	// Authenticated API
@@ -49,6 +48,7 @@ func RegisterRoutes(r *gin.Engine, h *handlers.Handler, sessions *auth.SessionMa
 		api.GET("/scans/:id/commits", h.ListScanCommits)
 		api.GET("/scans/:id/groups", h.ListScanGroups)
 		api.GET("/scans/:id/drafts", h.ListScanDrafts)
+		api.GET("/scans/:id/deliveries", h.ListScanDeliveries)
 		api.POST("/scans/:id/deliver", h.DeliverScan)
 		api.DELETE("/scans/:id", h.CancelScan)
 
@@ -71,5 +71,8 @@ func RegisterRoutes(r *gin.Engine, h *handlers.Handler, sessions *auth.SessionMa
 		api.DELETE("/team/members/:id", middleware.RequireRole("admin"), h.RemoveMember)
 		api.GET("/team/config", h.GetTeamConfig)
 		api.PUT("/team/config", middleware.RequireRole("admin"), h.UpdateTeamConfig)
+
+		// Sources
+		api.GET("/sources", h.GetSources)
 	}
 }

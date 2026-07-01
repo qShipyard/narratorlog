@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { authApi, setupApi } from '@/lib/api'
 import { Sidebar } from '@/components/sidebar'
+import { CommandPalette } from '@/components/command-palette'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
@@ -24,30 +25,47 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (setupStatus && !setupStatus.setup_complete) {
-      router.push('/setup')
+      router.replace('/setup')
     }
   }, [setupStatus, router])
 
   useEffect(() => {
-    if (isError) router.push('/login')
-  }, [isError, router])
+    if (setupStatus?.setup_complete && isError) {
+      router.replace('/login')
+    }
+  }, [setupStatus, isError, router])
 
-  if (isLoading || !setupStatus) {
+  if (!setupStatus) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-muted-foreground text-sm">Loading...</div>
+        <div className="text-muted-foreground text-sm">Loading…</div>
       </div>
     )
   }
 
-  if (!user) return null
+  if (!setupStatus.setup_complete) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-muted-foreground text-sm">Opening setup…</div>
+      </div>
+    )
+  }
+
+  if (isLoading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-muted-foreground text-sm">Loading…</div>
+      </div>
+    )
+  }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-dvh overflow-hidden">
       <Sidebar user={user} />
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain ledger-paper">
         {children}
       </main>
+      <CommandPalette />
     </div>
   )
 }

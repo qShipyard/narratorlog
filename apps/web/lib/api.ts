@@ -8,11 +8,22 @@ export const api = axios.create({
   },
 })
 
+const PUBLIC_ROUTES = ['/setup', '/login', '/activate']
+
+function isPublicRoute(pathname: string): boolean {
+  return PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith(`${route}/`))
+}
+
 api.interceptors.response.use(
   res => res,
   err => {
-    if (err.response?.status === 401) {
-      window.location.href = '/login'
+    if (typeof window !== 'undefined' && err.response?.status === 401) {
+      const path = window.location.pathname
+      const url = err.config?.url ?? ''
+      const isSetupStatus = url.includes('/setup/status')
+      if (!isPublicRoute(path) && !isSetupStatus) {
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(err)
   }
@@ -47,7 +58,7 @@ export interface Repository {
 
 export interface Scan {
   id: string
-  repository: {
+  repository?: {
     id: string
     full_name: string
   }
@@ -57,6 +68,8 @@ export interface Scan {
   scan_to: string
   commit_count: number
   filtered_count: number
+  error?: string | null
+  error_hint?: string
   drafts_pending: number
   drafts_approved: number
   created_at: string
@@ -110,6 +123,50 @@ export interface Comment {
   created_at: string
 }
 
+export interface ScanDelivery {
+  id: string
+  draft_id: string
+  audience_id: string
+  output_plugin: string
+  status: 'pending' | 'success' | 'failed'
+  attempt_count: number
+  delivered_at?: string
+  created_at: string
+  response?: unknown
+}
+
+export interface HealthCheck {
+  ok: boolean
+  active?: number
+}
+
+export interface HealthResponse {
+  status: 'ok' | 'degraded'
+  version: string
+  checks: {
+    database?: HealthCheck
+    redis?: HealthCheck
+    worker?: HealthCheck
+  }
+}
+
+export interface TeamMember {
+  id: string
+  name: string
+  email: string
+  role: User['role']
+  avatar_url?: string
+  created_at: string
+}
+
+export interface InviteMemberResponse {
+  id: string
+  name: string
+  email: string
+  role: User['role']
+  temporary_password: string
+}
+
 export interface Pagination {
   next_cursor?: string
   has_more: boolean
@@ -143,6 +200,8 @@ export interface TeamConfigView {
   privacy: { scrub_secrets: boolean; local_only: boolean }
   integrations: Record<string, Record<string, boolean>>
   routing: RoutingEntry[]
+  sources: Record<string, { token_set: boolean; base_url: string }>
+  activation_complete: boolean
 }
 
 export interface TeamConfigUpdate {
@@ -156,9 +215,39 @@ export interface TeamConfigUpdate {
   privacy: { scrub_secrets: boolean; local_only: boolean }
   integrations: Record<string, Record<string, string>> // empty value = keep existing
   routing: RoutingEntry[]
+  sources: Record<string, { token: string; base_url: string }>
+  activation_complete: boolean
+}
+
+// Build an update payload that preserves everything in the current config.
+// Empty token / api_key / integration value all mean "keep existing" on the
+// server, so callers only set the one field they intend to change.
+export function configViewToUpdate(v: TeamConfigView): TeamConfigUpdate {
+  const sources: Record<string, { token: string; base_url: string }> = {}
+  for (const p of ['github', 'gitlab', 'bitbucket']) {
+    sources[p] = { token: '', base_url: v.sources?.[p]?.base_url ?? '' }
+  }
+  return {
+    ai: {
+      provider: v.ai.provider,
+      model: v.ai.model,
+      base_url: v.ai.base_url,
+      depth: v.ai.depth,
+      api_key: '',
+    },
+    privacy: v.privacy,
+    integrations: {},
+    routing: v.routing ?? [],
+    sources,
+    activation_complete: v.activation_complete ?? false,
+  }
 }
 
 // ─── API calls ────────────────────────────────────────────────────────────────
+
+export const healthApi = {
+  get: () => api.get<HealthResponse>('/health'),
+}
 
 export const setupApi = {
   status: () => api.get<{ setup_complete: boolean }>('/setup/status'),
@@ -179,14 +268,14 @@ export const authApi = {
 
 export const reposApi = {
   list: () => api.get<{ data: Repository[] }>('/api/v1/repos'),
-  available: () => api.get<{ data: AvailableRepo[] }>('/api/v1/repos/available'),
+  available: (provider: string) =>
+    api.get<{ data: AvailableRepo[] }>('/api/v1/repos/available', { params: { provider } }),
   connect: (data: {
     provider: string
     provider_id: string
     full_name: string
     url: string
     default_branch: string
-    access_token: string
   }) => api.post<Repository>('/api/v1/repos', data),
   get: (id: string) => api.get<Repository>(`/api/v1/repos/${id}`),
   update: (id: string, config: Record<string, unknown>) =>
@@ -203,6 +292,7 @@ export const scansApi = {
   groups: (id: string) => api.get<{ data: CommitGroup[] }>(`/api/v1/scans/${id}/groups`),
   drafts: (id: string) => api.get<{ data: AudienceDraft[] }>(`/api/v1/scans/${id}/drafts`),
   deliver: (id: string) => api.post(`/api/v1/scans/${id}/deliver`),
+  deliveries: (id: string) => api.get<{ data: ScanDelivery[] }>(`/api/v1/scans/${id}/deliveries`),
 }
 
 export const draftsApi = {
@@ -221,11 +311,15 @@ export const draftsApi = {
 
 export const teamApi = {
   get: () => api.get('/api/v1/team'),
-  members: () => api.get('/api/v1/team/members'),
-  invite: (email: string, role: string) => api.post('/api/v1/team/invite', { email, role }),
-  updateRole: (id: string, role: string) => api.patch(`/api/v1/team/members/${id}`, { role }),
+  members: () => api.get<{ data: TeamMember[] }>('/api/v1/team/members'),
+  invite: (data: { name: string; email: string; role: User['role'] }) =>
+    api.post<InviteMemberResponse>('/api/v1/team/invite', data),
+  updateRole: (id: string, role: User['role']) =>
+    api.patch<{ id: string; role: User['role'] }>(`/api/v1/team/members/${id}`, { role }),
   remove: (id: string) => api.delete(`/api/v1/team/members/${id}`),
   getConfig: () => api.get<TeamConfigView>('/api/v1/team/config'),
   updateConfig: (data: TeamConfigUpdate) =>
     api.put<TeamConfigView>('/api/v1/team/config', data),
+  getSources: () =>
+    api.get<Record<string, { token_set: boolean; base_url: string }>>('/api/v1/sources'),
 }

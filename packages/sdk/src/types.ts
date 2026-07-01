@@ -15,6 +15,7 @@ export interface SourceRequest {
   scan_to: string         // ISO 8601 UTC
   access_token: string
   depth: AIDepth
+  base_url?: string
 }
 
 export interface RawCommit {

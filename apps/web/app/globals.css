@@ -7,9 +7,14 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-geist-sans);
+  --font-display: var(--font-space-display);
+  --font-mono: var(--font-space-mono);
+  --font-serif: var(--font-newsreader);
+  --font-heading: var(--font-space-display);
+  --color-signal: var(--signal);
+  --color-signal-foreground: var(--signal-foreground);
+  --color-rail: var(--rail);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,72 +54,79 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  /* Ledger ink — prussian + signal amber on cool paper */
+  --background: oklch(0.968 0.006 248);
+  --foreground: oklch(0.19 0.025 252);
+  --card: oklch(0.995 0.002 248);
+  --card-foreground: oklch(0.19 0.025 252);
+  --popover: oklch(0.995 0.002 248);
+  --popover-foreground: oklch(0.19 0.025 252);
+  --primary: oklch(0.36 0.08 252);
+  --primary-foreground: oklch(0.985 0.005 250);
+  --secondary: oklch(0.948 0.008 248);
+  --secondary-foreground: oklch(0.28 0.04 252);
+  --muted: oklch(0.948 0.008 248);
+  --muted-foreground: oklch(0.48 0.025 252);
+  --accent: oklch(0.925 0.014 248);
+  --accent-foreground: oklch(0.28 0.045 252);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --border: oklch(0.878 0.012 248);
+  --input: oklch(0.878 0.012 248);
+  --ring: oklch(0.52 0.075 252);
+  --signal: oklch(0.74 0.155 68);
+  --signal-foreground: oklch(0.28 0.06 65);
+  --rail: oklch(0.84 0.014 248);
+  --chart-1: oklch(0.4 0.075 248);
+  --chart-2: oklch(0.55 0.07 248);
+  --chart-3: oklch(0.76 0.15 73);
+  --chart-4: oklch(0.65 0.06 200);
+  --chart-5: oklch(0.5 0.08 300);
+  --radius: 0.5rem;
+  --sidebar: oklch(0.982 0.004 248);
+  --sidebar-foreground: oklch(0.205 0.02 250);
+  --sidebar-primary: oklch(0.4 0.075 248);
+  --sidebar-primary-foreground: oklch(0.985 0.005 250);
+  --sidebar-accent: oklch(0.955 0.006 248);
+  --sidebar-accent-foreground: oklch(0.32 0.04 250);
+  --sidebar-border: oklch(0.905 0.007 248);
+  --sidebar-ring: oklch(0.55 0.07 248);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: oklch(0.2 0.03 252);
+  --foreground: oklch(0.96 0.008 250);
+  --card: oklch(0.255 0.03 252);
+  --card-foreground: oklch(0.96 0.008 250);
+  --popover: oklch(0.255 0.03 252);
+  --popover-foreground: oklch(0.96 0.008 250);
+  --primary: oklch(0.7 0.12 248);
+  --primary-foreground: oklch(0.18 0.03 252);
+  --secondary: oklch(0.29 0.03 252);
+  --secondary-foreground: oklch(0.96 0.008 250);
+  --muted: oklch(0.29 0.03 252);
+  --muted-foreground: oklch(0.7 0.02 250);
+  --accent: oklch(0.32 0.04 252);
+  --accent-foreground: oklch(0.96 0.008 250);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
+  --border: oklch(1 0 0 / 11%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --ring: oklch(0.6 0.1 248);
+  --signal: oklch(0.78 0.14 75);
+  --signal-foreground: oklch(0.22 0.03 70);
+  --rail: oklch(1 0 0 / 14%);
+  --chart-1: oklch(0.7 0.12 248);
+  --chart-2: oklch(0.6 0.1 248);
+  --chart-3: oklch(0.78 0.14 75);
+  --chart-4: oklch(0.7 0.08 200);
+  --chart-5: oklch(0.65 0.1 300);
+  --sidebar: oklch(0.225 0.03 252);
+  --sidebar-foreground: oklch(0.96 0.008 250);
+  --sidebar-primary: oklch(0.7 0.12 248);
+  --sidebar-primary-foreground: oklch(0.18 0.03 252);
+  --sidebar-accent: oklch(0.29 0.03 252);
+  --sidebar-accent-foreground: oklch(0.96 0.008 250);
+  --sidebar-border: oklch(1 0 0 / 11%);
+  --sidebar-ring: oklch(0.6 0.1 248);
 }
 
 @layer base {
@@ -126,5 +138,116 @@
   }
   html {
     @apply font-sans;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  label[for],
+  summary,
+  [data-slot="button"]:not(:disabled),
+  [data-slot="tabs-trigger"]:not(:disabled),
+  [data-slot="select-trigger"]:not(:disabled),
+  [data-slot="dropdown-menu-item"]:not([data-disabled]),
+  [data-slot="dropdown-menu-checkbox-item"]:not([data-disabled]),
+  [data-slot="dropdown-menu-radio-item"]:not([data-disabled]),
+  [data-slot="dropdown-menu-sub-trigger"]:not([data-disabled]) {
+    @apply cursor-pointer;
+  }
+  button:disabled,
+  [aria-disabled="true"],
+  [data-disabled] {
+    @apply cursor-not-allowed;
+  }
+}
+
+@layer components {
+  /* Mono caps label — the "log" voice for eyebrows and field captions */
+  .eyebrow {
+    @apply font-mono text-[0.6875rem] font-bold uppercase tracking-[0.18em] text-muted-foreground;
+  }
+
+  /* The marker rail: a left margin where narratorlog marks the entries that
+     matter. Apply .rail to a vertical list; .rail-node to each row; add
+     .is-signal to the row that needs a human. */
+  .rail {
+    @apply relative pl-7;
+  }
+  .rail::before {
+    content: "";
+    @apply absolute top-2 bottom-2 left-[7px] w-px bg-rail;
+  }
+  .rail-node {
+    @apply relative;
+  }
+  .rail-node::before {
+    content: "";
+    @apply absolute top-[1.35rem] -left-[1.4rem] z-[1] size-[7px] rounded-[2px] bg-rail ring-4 ring-card;
+  }
+  .rail-node.is-signal::before {
+    @apply bg-signal ring-signal/15;
+  }
+
+  /* App shell — cool paper ground for operational pages */
+  .ledger-paper {
+    background-color: var(--background);
+    background-image:
+      linear-gradient(
+        to bottom,
+        color-mix(in oklch, var(--foreground) 3%, transparent),
+        transparent 120px
+      ),
+      radial-gradient(
+        color-mix(in oklch, var(--foreground) 5%, transparent) 1px,
+        transparent 1px
+      );
+    background-size: auto, 24px 24px;
+  }
+
+  /* Story workspace — focused split view without jarring dark island */
+  .ledger-workspace {
+    @apply min-h-full;
+    background-color: var(--background);
+    background-image: linear-gradient(
+      90deg,
+      color-mix(in oklch, var(--border) 40%, transparent) 0,
+      color-mix(in oklch, var(--border) 40%, transparent) 1px,
+      transparent 1px,
+      transparent 100%
+    );
+    background-size: min(42%, 520px) 100%;
+    background-repeat: no-repeat;
+  }
+
+  /* Investigation theater — optional dark register (review deep-focus) */
+  .theater {
+    background-color: var(--background);
+    background-image: radial-gradient(
+      color-mix(in oklch, var(--foreground) 9%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 22px 22px;
+  }
+
+  /* The amber pulse that travels the active pipeline connector. */
+  .connector-live {
+    background-image: linear-gradient(
+      90deg,
+      var(--rail) 0%,
+      var(--signal) 50%,
+      var(--rail) 100%
+    );
+    background-size: 200% 100%;
+    animation: connector-travel 1.6s linear infinite;
+  }
+  @keyframes connector-travel {
+    from { background-position: 200% 0; }
+    to { background-position: 0% 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .connector-live {
+      animation: none;
+      background: var(--signal);
+    }
   }
 }

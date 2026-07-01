@@ -1,0 +1,22 @@
+{
+  "name": "@narratorlog/plugin-source-gitlab",
+  "version": "0.1.0",
+  "description": "GitLab source plugin for narratorlog",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "node --test dist/index.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@narratorlog/sdk": "workspace:*",
+    "@gitbeaker/rest": "^42.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "typescript": "^6.0.3"
+  }
+}

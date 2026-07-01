@@ -216,7 +216,7 @@ func (q *Queries) UpdateScanCounts(ctx context.Context, arg UpdateScanCountsPara
 
 const updateScanStatus = `-- name: UpdateScanStatus :exec
 UPDATE scans
-SET status = $1, updated_at = now()
+SET status = $1, error = NULL, updated_at = now()
 WHERE id = $2
 `
 

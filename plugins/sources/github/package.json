@@ -13,7 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "@narratorlog/sdk": "workspace:*",
-    "@octokit/rest": "^22.0.1"
+    "@octokit/rest": "^20.1.2"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",

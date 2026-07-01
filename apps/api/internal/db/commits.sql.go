@@ -88,6 +88,59 @@ func (q *Queries) CreateCommit(ctx context.Context, arg CreateCommitParams) (Com
 	return i, err
 }
 
+const createCommitIgnoreDuplicate = `-- name: CreateCommitIgnoreDuplicate :exec
+INSERT INTO commits (
+  scan_id, repository_id, sha, message, author_name, author_email,
+  committed_at, pr_number, pr_title, pr_description, linked_issues,
+  changed_files, diff, is_noise, is_bot, is_breaking, domain
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+ON CONFLICT (scan_id, sha) DO NOTHING
+`
+
+type CreateCommitIgnoreDuplicateParams struct {
+	ScanID        uuid.UUID          `json:"scan_id"`
+	RepositoryID  uuid.UUID          `json:"repository_id"`
+	Sha           string             `json:"sha"`
+	Message       string             `json:"message"`
+	AuthorName    string             `json:"author_name"`
+	AuthorEmail   string             `json:"author_email"`
+	CommittedAt   pgtype.Timestamptz `json:"committed_at"`
+	PrNumber      pgtype.Int4        `json:"pr_number"`
+	PrTitle       pgtype.Text        `json:"pr_title"`
+	PrDescription pgtype.Text        `json:"pr_description"`
+	LinkedIssues  []byte             `json:"linked_issues"`
+	ChangedFiles  []byte             `json:"changed_files"`
+	Diff          pgtype.Text        `json:"diff"`
+	IsNoise       bool               `json:"is_noise"`
+	IsBot         bool               `json:"is_bot"`
+	IsBreaking    bool               `json:"is_breaking"`
+	Domain        pgtype.Text        `json:"domain"`
+}
+
+func (q *Queries) CreateCommitIgnoreDuplicate(ctx context.Context, arg CreateCommitIgnoreDuplicateParams) error {
+	_, err := q.db.Exec(ctx, createCommitIgnoreDuplicate,
+		arg.ScanID,
+		arg.RepositoryID,
+		arg.Sha,
+		arg.Message,
+		arg.AuthorName,
+		arg.AuthorEmail,
+		arg.CommittedAt,
+		arg.PrNumber,
+		arg.PrTitle,
+		arg.PrDescription,
+		arg.LinkedIssues,
+		arg.ChangedFiles,
+		arg.Diff,
+		arg.IsNoise,
+		arg.IsBot,
+		arg.IsBreaking,
+		arg.Domain,
+	)
+	return err
+}
+
 const getCommitSHAsByScan = `-- name: GetCommitSHAsByScan :many
 SELECT sha FROM commits WHERE scan_id = $1
 `

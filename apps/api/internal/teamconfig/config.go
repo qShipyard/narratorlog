@@ -25,15 +25,25 @@ type Output struct {
 	Config   map[string]interface{} `json:"config"`
 }
 
+type Source struct {
+	TokenEncrypted string `json:"token_encrypted,omitempty"`
+	BaseURL        string `json:"base_url,omitempty"`
+}
+
 type Config struct {
-	AI           AI                           `json:"ai"`
-	Privacy      Privacy                      `json:"privacy"`
-	Integrations map[string]map[string]string `json:"integrations"`
-	Routing      []Output                     `json:"routing"`
+	AI                 AI                           `json:"ai"`
+	Privacy            Privacy                      `json:"privacy"`
+	Integrations       map[string]map[string]string `json:"integrations"`
+	Sources            map[string]Source            `json:"sources,omitempty"`
+	Routing            []Output                     `json:"routing"`
+	ActivationComplete bool                         `json:"activation_complete,omitempty"`
 }
 
 func Parse(raw []byte) (*Config, error) {
-	c := &Config{Integrations: map[string]map[string]string{}}
+	c := &Config{
+		Integrations: map[string]map[string]string{},
+		Sources:      map[string]Source{},
+	}
 	if len(raw) == 0 || string(raw) == "{}" {
 		return c, nil
 	}
@@ -42,6 +52,9 @@ func Parse(raw []byte) (*Config, error) {
 	}
 	if c.Integrations == nil {
 		c.Integrations = map[string]map[string]string{}
+	}
+	if c.Sources == nil {
+		c.Sources = map[string]Source{}
 	}
 	return c, nil
 }
@@ -60,11 +73,18 @@ type AIUpdate struct {
 	APIKey   string `json:"api_key"` // plaintext; empty means "keep existing"
 }
 
+type SourceUpdate struct {
+	Token   string `json:"token"`
+	BaseURL string `json:"base_url"`
+}
+
 type UpdateRequest struct {
-	AI           AIUpdate                     `json:"ai"`
-	Privacy      Privacy                      `json:"privacy"`
-	Integrations map[string]map[string]string `json:"integrations"` // plaintext; empty value means "keep existing"
-	Routing      []Output                     `json:"routing"`
+	AI                 AIUpdate                     `json:"ai"`
+	Privacy            Privacy                      `json:"privacy"`
+	Integrations       map[string]map[string]string `json:"integrations"` // plaintext; empty value means "keep existing"
+	Sources            map[string]SourceUpdate      `json:"sources"`
+	Routing            []Output                     `json:"routing"`
+	ActivationComplete bool                         `json:"activation_complete"`
 }
 
 func (c *Config) ApplyUpdate(in UpdateRequest, enc *auth.Encryptor) error {
@@ -101,7 +121,24 @@ func (c *Config) ApplyUpdate(in UpdateRequest, enc *auth.Encryptor) error {
 		}
 	}
 
+	if c.Sources == nil {
+		c.Sources = map[string]Source{}
+	}
+	for provider, in := range in.Sources {
+		s := c.Sources[provider]
+		s.BaseURL = in.BaseURL
+		if in.Token != "" {
+			ct, err := enc.Encrypt(in.Token)
+			if err != nil {
+				return err
+			}
+			s.TokenEncrypted = ct
+		}
+		c.Sources[provider] = s
+	}
+
 	c.Routing = in.Routing
+	c.ActivationComplete = in.ActivationComplete
 	return nil
 }
 
@@ -115,11 +152,18 @@ type AIView struct {
 	APIKeySet bool   `json:"api_key_set"`
 }
 
+type SourceView struct {
+	TokenSet bool   `json:"token_set"`
+	BaseURL  string `json:"base_url"`
+}
+
 type ClientView struct {
-	AI           AIView                     `json:"ai"`
-	Privacy      Privacy                    `json:"privacy"`
-	Integrations map[string]map[string]bool `json:"integrations"`
-	Routing      []Output                   `json:"routing"`
+	AI                 AIView                     `json:"ai"`
+	Privacy            Privacy                    `json:"privacy"`
+	Integrations       map[string]map[string]bool `json:"integrations"`
+	Sources            map[string]SourceView      `json:"sources"`
+	Routing            []Output                   `json:"routing"`
+	ActivationComplete bool                       `json:"activation_complete"`
 }
 
 func (c *Config) View() ClientView {
@@ -130,6 +174,13 @@ func (c *Config) View() ClientView {
 			integrations[plugin][name] = ct != ""
 		}
 	}
+	sources := map[string]SourceView{}
+	for provider, s := range c.Sources {
+		sources[provider] = SourceView{
+			TokenSet: s.TokenEncrypted != "",
+			BaseURL:  s.BaseURL,
+		}
+	}
 	return ClientView{
 		AI: AIView{
 			Provider:  c.AI.Provider,
@@ -138,10 +189,24 @@ func (c *Config) View() ClientView {
 			Depth:     c.AI.Depth,
 			APIKeySet: c.AI.APIKeyEncrypted != "",
 		},
-		Privacy:      c.Privacy,
-		Integrations: integrations,
-		Routing:      c.Routing,
+		Privacy:            c.Privacy,
+		Integrations:       integrations,
+		Sources:            sources,
+		Routing:            c.Routing,
+		ActivationComplete: c.ActivationComplete,
 	}
+}
+
+func (c *Config) DecryptedSource(provider string, enc *auth.Encryptor) (token, baseURL string, ok bool, err error) {
+	s, exists := c.Sources[provider]
+	if !exists || s.TokenEncrypted == "" {
+		return "", "", false, nil
+	}
+	token, err = enc.Decrypt(s.TokenEncrypted)
+	if err != nil {
+		return "", "", false, err
+	}
+	return token, s.BaseURL, true, nil
 }
 
 func (c *Config) RoutingSnapshot() ([]byte, error) {

@@ -1,12 +1,20 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import { scansApi, reposApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { GitBranch, ScanLine, Clock, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 import { ScanCard } from '@/components/scan-card'
+import { PageHeader } from '@/components/page-header'
+import { FirstRunChecklist } from '@/components/first-run-checklist'
+import { ReadinessStrip } from '@/components/readiness-strip'
+import { LedgerList, LedgerPanel } from '@/components/ledger-list'
+import { RevealGroup, RevealItem } from '@/components/reveal'
+import { useReadiness } from '@/lib/hooks/use-readiness'
+import { draftPreviewText } from '@/lib/draft-preview'
+import { latestPendingByRepo } from '@/lib/dashboard-utils'
+import { copy } from '@/lib/copy'
+import { cn } from '@/lib/utils'
 
 export default function DashboardPage() {
   const { data: scansData } = useQuery({
@@ -22,111 +30,119 @@ export default function DashboardPage() {
   const scans = scansData?.data ?? []
   const repos = reposData?.data ?? []
 
-  const pendingApprovals = scans.filter(s => s.status === 'awaiting_approval')
+  const { readiness, isLoading: readinessLoading } = useReadiness(scans)
+
+  const pendingApprovals = latestPendingByRepo(scans)
   const delivered = scans.filter(s => s.status === 'delivered')
 
+  const draftQueries = useQueries({
+    queries: pendingApprovals.map(scan => ({
+      queryKey: ['scan-drafts', scan.id],
+      queryFn: () => scansApi.drafts(scan.id).then(r => r.data),
+      staleTime: 30_000,
+    })),
+  })
+
+  const previewByScanId = new Map(
+    pendingApprovals.map((scan, i) => {
+      const drafts = draftQueries[i]?.data?.data ?? []
+      const preview = draftPreviewText(drafts)
+      return [scan.id, preview] as const
+    }),
+  )
+
+  const stats = [
+    { label: 'Repositories', value: repos.length },
+    { label: copy.totalStories, value: scans.length },
+    { label: copy.needsReview, value: pendingApprovals.length, signal: true },
+    { label: copy.sent, value: delivered.length },
+  ]
+
   return (
-    <div className="p-8 space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          What your team shipped recently.
-        </p>
-      </div>
+    <div className="p-8 space-y-8 max-w-5xl">
+      <PageHeader
+        eyebrow="Workspace"
+        title="Dashboard"
+        description="What your team shipped, read back as a story."
+      />
 
-      <div className="grid grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Repositories
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <GitBranch className="h-4 w-4 text-muted-foreground" />
-              <span className="text-2xl font-bold">{repos.length}</span>
-            </div>
-          </CardContent>
-        </Card>
+      <FirstRunChecklist repos={repos} scans={scans} />
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Scans
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <ScanLine className="h-4 w-4 text-muted-foreground" />
-              <span className="text-2xl font-bold">{scans.length}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Awaiting Approval
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-yellow-500" />
-              <span className="text-2xl font-bold">{pendingApprovals.length}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Delivered
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              <span className="text-2xl font-bold">{delivered.length}</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <ReadinessStrip readiness={readiness} isLoading={readinessLoading} />
 
       {pendingApprovals.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-base font-semibold">Awaiting Your Approval</h2>
-          <div className="space-y-2">
-            {pendingApprovals.map(scan => (
-              <ScanCard key={scan.id} scan={scan} highlight />
-            ))}
+        <section className="space-y-3">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="eyebrow text-signal-foreground">{copy.awaitingReview}</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {pendingApprovals.length} {pendingApprovals.length === 1 ? 'story' : 'stories'} waiting for approval
+              </p>
+            </div>
+            <Link href="/scans">
+              <Button variant="outline" size="sm">View all</Button>
+            </Link>
           </div>
-        </div>
+          <RevealGroup>
+            <LedgerList>
+              {pendingApprovals.map(scan => (
+                <RevealItem key={scan.id}>
+                  <ScanCard
+                    scan={scan}
+                    highlight
+                    preview={previewByScanId.get(scan.id)}
+                  />
+                </RevealItem>
+              ))}
+            </LedgerList>
+          </RevealGroup>
+        </section>
       )}
 
-      <div className="space-y-3">
+      <LedgerPanel>
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-border/70">
+          {stats.map(s => (
+            <div key={s.label} className="px-5 py-4">
+              <p className="eyebrow">{s.label}</p>
+              <p
+                className={cn(
+                  'font-display text-[2rem] leading-none font-semibold mt-3 tabular-nums',
+                  s.signal && s.value > 0 && 'text-signal',
+                )}
+              >
+                {s.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      </LedgerPanel>
+
+      <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Recent Scans</h2>
+          <p className="eyebrow">{copy.recentStories}</p>
           <Link href="/scans">
-            <Button variant="ghost" size="sm">View all</Button>
+            <Button variant="ghost" size="sm">{copy.viewAllStories}</Button>
           </Link>
         </div>
         {scans.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground text-sm">No scans yet.</p>
-              <Link href="/repositories">
-                <Button className="mt-4" size="sm">Connect a repository</Button>
-              </Link>
-            </CardContent>
-          </Card>
+          <LedgerPanel className="py-14 text-center">
+            <p className="text-muted-foreground text-sm">{copy.noStoriesYet}</p>
+            <Link href="/repositories">
+              <Button className="mt-4" size="sm">Connect a repository</Button>
+            </Link>
+          </LedgerPanel>
         ) : (
-          <div className="space-y-2">
-            {scans.slice(0, 5).map(scan => (
-              <ScanCard key={scan.id} scan={scan} />
-            ))}
-          </div>
+          <RevealGroup>
+            <LedgerList>
+              {scans.slice(0, 6).map(scan => (
+                <RevealItem key={scan.id}>
+                  <ScanCard scan={scan} />
+                </RevealItem>
+              ))}
+            </LedgerList>
+          </RevealGroup>
         )}
-      </div>
+      </section>
     </div>
   )
 }

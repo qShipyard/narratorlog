@@ -9,6 +9,7 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgtype"
 	db "github.com/narratorlog/narratorlog/internal/db"
+	"github.com/narratorlog/narratorlog/internal/teamconfig"
 	"github.com/narratorlog/narratorlog/internal/worker/jobs"
 )
 
@@ -19,22 +20,59 @@ func (h *Handler) ListScans(c *gin.Context) {
 		return
 	}
 
-	scans, err := h.queries.ListScansByTeam(c.Request.Context(), db.ListScansByTeamParams{
-		TeamID: teamID,
-		Limit:  20,
-		Offset: 0,
-	})
-	if err != nil {
-		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to fetch scans.")
-		return
+	var scans []db.Scan
+	if repoParam := c.Query("repo_id"); repoParam != "" {
+		repoID, err := uuid.Parse(repoParam)
+		if err != nil {
+			errorResponse(c, http.StatusBadRequest, "INVALID_ID", "Invalid repository ID.")
+			return
+		}
+		scans, err = h.queries.ListScansByRepository(c.Request.Context(), db.ListScansByRepositoryParams{
+			RepositoryID: repoID,
+			Limit:        20,
+			Offset:       0,
+		})
+		if err != nil {
+			errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to fetch scans.")
+			return
+		}
+	} else {
+		scans, err = h.queries.ListScansByTeam(c.Request.Context(), db.ListScansByTeamParams{
+			TeamID: teamID,
+			Limit:  20,
+			Offset: 0,
+		})
+		if err != nil {
+			errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to fetch scans.")
+			return
+		}
 	}
 
+	getRepo := h.repoLookup(c)
 	data := make([]gin.H, len(scans))
 	for i, s := range scans {
-		data[i] = scanToJSON(s)
+		data[i] = scanToJSON(s, getRepo(s.RepositoryID))
 	}
 
 	c.JSON(http.StatusOK, gin.H{"data": data})
+}
+
+// repoLookup returns a memoized fetcher so a scan list resolves each repository
+// once, regardless of whether it is still active.
+func (h *Handler) repoLookup(c *gin.Context) func(uuid.UUID) *db.Repository {
+	cache := make(map[uuid.UUID]*db.Repository)
+	return func(id uuid.UUID) *db.Repository {
+		if r, ok := cache[id]; ok {
+			return r
+		}
+		r, err := h.queries.GetRepositoryByID(c.Request.Context(), id)
+		if err != nil {
+			cache[id] = nil
+			return nil
+		}
+		cache[id] = &r
+		return &r
+	}
 }
 
 func (h *Handler) TriggerScan(c *gin.Context) {
@@ -62,6 +100,38 @@ func (h *Handler) TriggerScan(c *gin.Context) {
 	repoID, err := uuid.Parse(req.RepositoryID)
 	if err != nil {
 		errorResponse(c, http.StatusBadRequest, "INVALID_ID", "Invalid repository ID.")
+		return
+	}
+
+	repo, err := h.queries.GetRepositoryByID(c.Request.Context(), repoID)
+	if err != nil {
+		errorResponse(c, http.StatusNotFound, "NOT_FOUND", "Repository not found.")
+		return
+	}
+	if repo.TeamID != teamID {
+		errorResponse(c, http.StatusForbidden, "FORBIDDEN", "You don't have permission to scan this repository.")
+		return
+	}
+
+	rawCfg, err := h.queries.GetTeamConfig(c.Request.Context(), teamID)
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to load team settings.")
+		return
+	}
+	tc, err := teamconfig.Parse(rawCfg)
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to parse team settings.")
+		return
+	}
+	if _, _, ok, err := tc.DecryptedSource(string(repo.Provider), h.encryptor); err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to read git source settings.")
+		return
+	} else if !ok {
+		errorResponse(c, http.StatusConflict, "SOURCE_NOT_CONNECTED", "Add a git access token in Settings → Git sources before running a scan.")
+		return
+	}
+	if tc.AI.APIKeyEncrypted == "" {
+		errorResponse(c, http.StatusConflict, "AI_NOT_CONFIGURED", "Add an AI API key in Settings → AI provider before running a scan.")
 		return
 	}
 
@@ -116,7 +186,12 @@ func (h *Handler) GetScan(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, scanToJSON(scan))
+	var repo *db.Repository
+	if r, err := h.queries.GetRepositoryByID(c.Request.Context(), scan.RepositoryID); err == nil {
+		repo = &r
+	}
+
+	c.JSON(http.StatusOK, scanToJSON(scan, repo))
 }
 
 func (h *Handler) ListScanCommits(c *gin.Context) {
@@ -199,6 +274,60 @@ func (h *Handler) ListScanDrafts(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": data})
 }
 
+func (h *Handler) ListScanDeliveries(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		errorResponse(c, http.StatusBadRequest, "INVALID_ID", "Invalid scan ID.")
+		return
+	}
+
+	teamID, err := uuid.Parse(c.GetString("team_id"))
+	if err != nil {
+		errorResponse(c, http.StatusUnauthorized, "INVALID_SESSION", "Invalid session.")
+		return
+	}
+
+	scan, err := h.queries.GetScanByID(c.Request.Context(), id)
+	if err != nil {
+		errorResponse(c, http.StatusNotFound, "NOT_FOUND", "Scan not found.")
+		return
+	}
+
+	repo, err := h.queries.GetRepositoryByID(c.Request.Context(), scan.RepositoryID)
+	if err != nil || repo.TeamID != teamID {
+		errorResponse(c, http.StatusNotFound, "NOT_FOUND", "Scan not found.")
+		return
+	}
+
+	rows, err := h.queries.ListDeliveriesByScan(c.Request.Context(), id)
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to fetch deliveries.")
+		return
+	}
+
+	data := make([]gin.H, len(rows))
+	for i, row := range rows {
+		item := gin.H{
+			"id":            row.ID,
+			"draft_id":      row.DraftID,
+			"audience_id":   row.AudienceID,
+			"output_plugin": row.OutputPlugin,
+			"status":        row.Status,
+			"attempt_count": row.AttemptCount,
+			"created_at":    row.CreatedAt,
+		}
+		if row.DeliveredAt.Valid {
+			item["delivered_at"] = row.DeliveredAt.Time
+		}
+		if len(row.Response) > 0 {
+			item["response"] = row.Response
+		}
+		data[i] = item
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": data})
+}
+
 func (h *Handler) DeliverScan(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -213,6 +342,30 @@ func (h *Handler) DeliverScan(c *gin.Context) {
 	}
 
 	teamID, _ := uuid.Parse(c.GetString("team_id"))
+	rawCfg, err := h.queries.GetTeamConfig(c.Request.Context(), teamID)
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to load team settings.")
+		return
+	}
+	tc, err := teamconfig.Parse(rawCfg)
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to parse team settings.")
+		return
+	}
+	if len(tc.Routing) == 0 {
+		errorResponse(c, http.StatusUnprocessableEntity, "NO_ROUTING",
+			"No delivery destinations configured. Go to Settings → Delivery and add a route for each audience you want to publish to.")
+		return
+	}
+
+	if err := h.queries.UpdateScanStatus(c.Request.Context(), db.UpdateScanStatusParams{
+		Status: db.ScanStatusDelivering,
+		ID:     id,
+	}); err != nil {
+		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to start delivery.")
+		return
+	}
+
 	payload, _ := jobs.Marshal(jobs.DeliveryPayload{
 		ScanID: id.String(),
 		TeamID: teamID.String(),
@@ -220,11 +373,15 @@ func (h *Handler) DeliverScan(c *gin.Context) {
 
 	task := asynq.NewTask(jobs.JobDeliver, payload)
 	if _, err := h.asynq.Enqueue(task); err != nil {
+		_ = h.queries.UpdateScanStatus(c.Request.Context(), db.UpdateScanStatusParams{
+			Status: db.ScanStatusAwaitingApproval,
+			ID:     id,
+		})
 		errorResponse(c, http.StatusInternalServerError, "SERVER_ERROR", "Failed to queue delivery.")
 		return
 	}
 
-	c.JSON(http.StatusAccepted, gin.H{"message": "Delivery queued."})
+	c.JSON(http.StatusAccepted, gin.H{"message": "Delivery started.", "status": "delivering"})
 }
 
 func (h *Handler) CancelScan(c *gin.Context) {
@@ -245,8 +402,8 @@ func (h *Handler) CancelScan(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func scanToJSON(s db.Scan) gin.H {
-	return gin.H{
+func scanToJSON(s db.Scan, repo *db.Repository) gin.H {
+	h := gin.H{
 		"id":             s.ID,
 		"team_id":        s.TeamID,
 		"repository_id":  s.RepositoryID,
@@ -260,6 +417,16 @@ func scanToJSON(s db.Scan) gin.H {
 		"created_at":     s.CreatedAt,
 		"updated_at":     s.UpdatedAt,
 	}
+	if hint := scanErrorHint(s.Error); hint != nil && s.Status == db.ScanStatusFailed {
+		h["error_hint"] = *hint
+	}
+	if repo != nil {
+		h["repository"] = gin.H{
+			"id":        repo.ID,
+			"full_name": repo.FullName,
+		}
+	}
+	return h
 }
 
 func lookbackToTime(lookback string) time.Time {
@@ -275,4 +442,3 @@ func lookbackToTime(lookback string) time.Time {
 	}
 	return time.Now().UTC().Add(-d)
 }
-

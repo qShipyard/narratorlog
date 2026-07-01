@@ -29,7 +29,7 @@ type CreateRepositoryParams struct {
 	FullName      string      `json:"full_name"`
 	Url           string      `json:"url"`
 	DefaultBranch string      `json:"default_branch"`
-	AccessToken   string      `json:"access_token"`
+	AccessToken   pgtype.Text `json:"access_token"`
 	WebhookSecret pgtype.Text `json:"webhook_secret"`
 	Config        []byte      `json:"config"`
 }

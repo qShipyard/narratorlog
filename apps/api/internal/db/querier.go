@@ -19,6 +19,7 @@ type Querier interface {
 	CreateAuditLog(ctx context.Context, arg CreateAuditLogParams) error
 	CreateCommit(ctx context.Context, arg CreateCommitParams) (Commit, error)
 	CreateCommitGroup(ctx context.Context, arg CreateCommitGroupParams) (CommitGroup, error)
+	CreateCommitIgnoreDuplicate(ctx context.Context, arg CreateCommitIgnoreDuplicateParams) error
 	CreateDelivery(ctx context.Context, arg CreateDeliveryParams) (Delivery, error)
 	CreateDraftComment(ctx context.Context, arg CreateDraftCommentParams) (DraftComment, error)
 	CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error)
@@ -57,6 +58,7 @@ type Querier interface {
 	ListCommitGroupsByScan(ctx context.Context, scanID uuid.UUID) ([]CommitGroup, error)
 	ListCommitsByScan(ctx context.Context, scanID uuid.UUID) ([]Commit, error)
 	ListDeliveriesByDraft(ctx context.Context, draftID uuid.UUID) ([]Delivery, error)
+	ListDeliveriesByScan(ctx context.Context, scanID uuid.UUID) ([]ListDeliveriesByScanRow, error)
 	ListDraftsByScan(ctx context.Context, scanID uuid.UUID) ([]AudienceDraft, error)
 	ListRepositoriesByTeam(ctx context.Context, teamID uuid.UUID) ([]Repository, error)
 	ListScansByRepository(ctx context.Context, arg ListScansByRepositoryParams) ([]Scan, error)

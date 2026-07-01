@@ -53,7 +53,7 @@ func main() {
 		log.Fatalf("failed to create encryptor: %v", err)
 	}
 
-	h := handlers.NewHandler(queries, sessions, encryptor, cfg, asynqClient)
+	h := handlers.NewHandler(queries, sessions, encryptor, cfg, asynqClient, pool, redisOpt)
 
 	if os.Getenv("GIN_MODE") == "" {
 		gin.SetMode(gin.ReleaseMode)

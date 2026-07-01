@@ -20,20 +20,6 @@ type Config struct {
 	AppSecret     string
 	EncryptionKey string
 
-	// OAuth
-	GitHub struct {
-		ClientID     string
-		ClientSecret string
-	}
-	GitLab struct {
-		ClientID     string
-		ClientSecret string
-	}
-	Bitbucket struct {
-		ClientID     string
-		ClientSecret string
-	}
-
 	// Reader
 	ReaderSocket string
 }
@@ -48,13 +34,6 @@ func Load() (*Config, error) {
 	cfg.AppSecret = mustEnv("APP_SECRET")
 	cfg.EncryptionKey = mustEnv("ENCRYPTION_KEY")
 	cfg.ReaderSocket = envOrDefault("READER_SOCKET", "/tmp/narratorlog-reader.sock")
-
-	cfg.GitHub.ClientID = os.Getenv("GITHUB_CLIENT_ID")
-	cfg.GitHub.ClientSecret = os.Getenv("GITHUB_CLIENT_SECRET")
-	cfg.GitLab.ClientID = os.Getenv("GITLAB_CLIENT_ID")
-	cfg.GitLab.ClientSecret = os.Getenv("GITLAB_CLIENT_SECRET")
-	cfg.Bitbucket.ClientID = os.Getenv("BITBUCKET_CLIENT_ID")
-	cfg.Bitbucket.ClientSecret = os.Getenv("BITBUCKET_CLIENT_SECRET")
 
 	if err := cfg.validate(); err != nil {
 		return nil, err

@@ -17,6 +17,7 @@ services:
     image: ghcr.io/qshipyard/narratorlog-web:latest
     environment:
       - NEXT_PUBLIC_API_URL=${APP_URL}
+      - API_INTERNAL_URL=http://api:8080
     depends_on:
       - api
     restart: unless-stopped
@@ -30,12 +31,6 @@ services:
       - APP_URL=${APP_URL}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - READER_SOCKET=/tmp/reader.sock
-      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
-      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
-      - GITLAB_CLIENT_ID=${GITLAB_CLIENT_ID}
-      - GITLAB_CLIENT_SECRET=${GITLAB_CLIENT_SECRET}
-      - BITBUCKET_CLIENT_ID=${BITBUCKET_CLIENT_ID}
-      - BITBUCKET_CLIENT_SECRET=${BITBUCKET_CLIENT_SECRET}
     volumes:
       - reader_socket:/tmp
     depends_on:

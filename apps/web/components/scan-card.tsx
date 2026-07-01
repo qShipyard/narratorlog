@@ -1,64 +1,85 @@
 import { Scan, ScanStatus } from '@/lib/api'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { getStoryStatus, STATUS_TONE_CLASS } from '@/lib/status-labels'
 
-const statusConfig: Record<ScanStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  pending:            { label: 'Pending',           variant: 'secondary' },
-  running:            { label: 'Running',           variant: 'default' },
-  filtering:          { label: 'Filtering',         variant: 'default' },
-  enriching:          { label: 'Enriching',         variant: 'default' },
-  reading_context:    { label: 'Reading context',   variant: 'default' },
-  chunking:           { label: 'Chunking',          variant: 'default' },
-  summarizing:        { label: 'Summarizing',       variant: 'default' },
-  awaiting_approval:  { label: 'Needs review',      variant: 'outline' },
-  approved:           { label: 'Approved',          variant: 'default' },
-  delivering:         { label: 'Delivering',        variant: 'default' },
-  delivered:          { label: 'Delivered',         variant: 'default' },
-  failed:             { label: 'Failed',            variant: 'destructive' },
-  cancelled:          { label: 'Cancelled',         variant: 'secondary' },
+function StatusChip({ status }: { status: ScanStatus }) {
+  const { label, tone } = getStoryStatus(status)
+  const live = tone === 'live'
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-sm border border-current/15 px-1.5 py-0.5 font-mono text-[0.625rem] font-bold uppercase tracking-[0.14em]',
+        STATUS_TONE_CLASS[tone],
+      )}
+    >
+      {live && <span className="size-1.5 rounded-[1px] bg-current animate-pulse" />}
+      {label}
+    </span>
+  )
 }
 
-export function ScanCard({ scan, highlight }: { scan: Scan; highlight?: boolean }) {
-  const status = statusConfig[scan.status]
+export function ScanCard({
+  scan,
+  highlight,
+  preview,
+}: {
+  scan: Scan
+  highlight?: boolean
+  preview?: string
+}) {
+  const needsReview = scan.status === 'awaiting_approval'
 
   return (
-    <Card className={cn(highlight && 'border-yellow-400/50 bg-yellow-400/5')}>
-      <CardContent className="py-4 flex items-center gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium truncate">
-              {scan.repository.full_name}
-            </span>
-            <Badge variant={status.variant} className="text-xs shrink-0">
-              {status.label}
-            </Badge>
-          </div>
-          <div className="flex items-center gap-3 mt-1">
-            <span className="text-xs text-muted-foreground">
-              {scan.commit_count} commits · {scan.filtered_count} filtered
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {formatDistanceToNow(new Date(scan.created_at), { addSuffix: true })}
-            </span>
-          </div>
+    <div
+      className={cn(
+        'rail-node group flex items-start gap-4 px-5 py-4 transition-colors',
+        needsReview || highlight
+          ? 'is-signal bg-signal/[0.04] hover:bg-signal/[0.07]'
+          : 'hover:bg-muted/40',
+      )}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <span className="font-mono text-[0.8125rem] font-bold tracking-tight truncate text-foreground">
+            {scan.repository?.full_name ?? 'Unknown repository'}
+          </span>
+          <StatusChip status={scan.status} />
         </div>
+        {preview ? (
+          <p className="mt-2 text-sm text-foreground/75 leading-relaxed line-clamp-2 font-serif">
+            {preview}
+          </p>
+        ) : null}
+        <div
+          className={cn(
+            'flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground',
+            preview ? 'mt-2' : 'mt-1.5',
+          )}
+        >
+          <span className="font-mono tabular-nums">{scan.commit_count} commits</span>
+          <span className="text-rail">·</span>
+          <span className="font-mono tabular-nums">{scan.filtered_count} filtered</span>
+          <span className="text-rail">·</span>
+          <span>{formatDistanceToNow(new Date(scan.created_at), { addSuffix: true })}</span>
+        </div>
+      </div>
 
-        {scan.status === 'awaiting_approval' && (
+      <div className="shrink-0 pt-0.5">
+        {needsReview ? (
           <Link href={`/scans/${scan.id}/review`}>
             <Button size="sm">Review</Button>
           </Link>
-        )}
-
-        {scan.status !== 'awaiting_approval' && (
+        ) : (
           <Link href={`/scans/${scan.id}`}>
-            <Button variant="ghost" size="sm">View</Button>
+            <Button variant="outline" size="sm" className="opacity-70 group-hover:opacity-100">
+              View
+            </Button>
           </Link>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

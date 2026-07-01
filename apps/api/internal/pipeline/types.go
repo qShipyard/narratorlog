@@ -43,12 +43,13 @@ const (
 
 type ScanConfig struct {
 	// Source
-	Provider    string // github | gitlab | bitbucket | git_cli
-	Repo        string
-	Branch      string
-	ScanFrom    time.Time
-	ScanTo      time.Time
-	AccessToken string
+	Provider      string // github | gitlab | bitbucket | git_cli
+	Repo          string
+	Branch        string
+	ScanFrom      time.Time
+	ScanTo        time.Time
+	AccessToken   string
+	SourceBaseURL string
 
 	// Filter
 	SkipAuthors  []string
@@ -151,6 +152,7 @@ type SourcePluginRequest struct {
 	ScanTo      string `json:"scan_to"`
 	AccessToken string `json:"access_token"`
 	Depth       string `json:"depth"`
+	BaseURL     string `json:"base_url,omitempty"`
 }
 
 type SourcePluginResponse struct {

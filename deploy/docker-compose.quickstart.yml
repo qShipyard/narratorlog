@@ -13,6 +13,8 @@ services:
       POSTGRES_DB: narratorlog
       POSTGRES_USER: narratorlog
       POSTGRES_PASSWORD: narratorlog
+    ports:
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -49,6 +51,7 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.api
     image: narratorlog-api:local
+    pull_policy: build
     environment:
       - DATABASE_URL=postgresql://narratorlog:narratorlog@postgres:5432/narratorlog?sslmode=disable
       - REDIS_URL=redis://redis:6379
@@ -71,7 +74,11 @@ services:
         condition: service_started
 
   worker:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
     image: narratorlog-api:local
+    pull_policy: never
     entrypoint: ["./narratorlog-worker"]
     environment:
       - DATABASE_URL=postgresql://narratorlog:narratorlog@postgres:5432/narratorlog?sslmode=disable
@@ -101,6 +108,9 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.web
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - API_INTERNAL_URL=http://api:8080
     ports:
       - "3000:3000"
     depends_on:

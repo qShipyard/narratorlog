@@ -176,10 +176,10 @@ Request:
 Response:
 ```json
 {
-  "file_path": "internal/auth/oauth.go",
-  "changed_functions": ["HandleCallback", "exchangeToken"],
-  "context": "// HandleCallback processes the OAuth callback...\nfunc HandleCallback(...) {\n...",
-  "imports": ["internal/db", "internal/config", "golang.org/x/oauth2"]
+  "file_path": "internal/sources/github.go",
+  "changed_functions": ["ListRepos", "RegisterWebhook"],
+  "context": "// ListRepos lists repositories the token can access...\nfunc (g *githubClient) ListRepos(...) {\n...",
+  "imports": ["net/http", "encoding/json"]
 }
 ```
 
